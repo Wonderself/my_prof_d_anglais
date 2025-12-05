@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/my-prof-d-anglais/gemini-coach', '.']
+images:
+- 'gcr.io/my-prof-d-anglais/gemini-coach'
