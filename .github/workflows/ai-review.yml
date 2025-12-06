@@ -1,0 +1,9 @@
+name: AI Code Review
+on: [pull_request]
+jobs:
+  gemini-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Analyze with Gemini
+        run: echo "Ici, on connectera l'agent IA plus tard pour relire ton code."

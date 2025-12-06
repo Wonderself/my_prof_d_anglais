@@ -1,5 +1,46 @@
 steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/my-prof-d-anglais/gemini-coach', '.']
+  # 1. Installation des dépendances
+  - name: 'python:3.11-slim'
+    id: 'install-deps'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install -r requirements.txt
+
+  # 2. Construction de l'image Docker (Build)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/gemini-coach:$SHORT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/gemini-coach:latest',
+      '--cache-from', 'gcr.io/$PROJECT_ID/gemini-coach:latest',
+      '.'
+    ]
+
+  # 3. Envoi de l'image vers le registre (Push)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args: ['push', 'gcr.io/$PROJECT_ID/gemini-coach:$SHORT_SHA']
+
+  # 4. Déploiement sur Cloud Run (Deploy)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy'
+    entrypoint: 'gcloud'
+    args: [
+      'run', 'deploy', 'gemini-coach',
+      '--image', 'gcr.io/$PROJECT_ID/gemini-coach:$SHORT_SHA',
+      '--region', 'us-central1',
+      '--platform', 'managed',
+      '--allow-unauthenticated'
+    ]
+
+# --- LA CORRECTION EST ICI ---
+# On force l'utilisation des logs Cloud natifs pour éviter l'erreur de bucket
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 images:
-- 'gcr.io/my-prof-d-anglais/gemini-coach'
+  - 'gcr.io/$PROJECT_ID/gemini-coach:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/gemini-coach:latest'
