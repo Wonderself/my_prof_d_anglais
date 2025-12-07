@@ -29,7 +29,15 @@
 </head>
 <body class="text-slate-800">
 
-    <div id="setup-screen" class="fixed inset-0 bg-white z-50 flex flex-col p-6 transition-transform duration-500 ease-in-out">
+    <div id="loader-screen" class="fixed inset-0 bg-slate-800 z-50 flex flex-col items-center justify-center p-6 transition-opacity duration-500">
+        <div class="animate-pulse text-white text-center">
+            <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p class="text-sm font-semibold tracking-wider uppercase">Robot is waking up...</p>
+            <p class="text-xs text-slate-400 mt-1">(Starting containers...)</p>
+        </div>
+    </div>
+
+    <div id="setup-screen" class="fixed inset-0 bg-white z-50 flex flex-col p-6 transition-transform duration-500 ease-in-out" style="display:none;">
         <div class="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
             <div class="mb-8 text-center">
                 
@@ -103,7 +111,7 @@
     </footer>
 
     <script>
-        // CORRECTION API_URL (L. 254) : Utilisation du protocole HTTPS comme source de vérité
+        // CORRECTION API_URL (L. 257) : Utilisation du protocole HTTPS comme source de vérité
         const API_URL = window.location.protocol === 'https:' 
             ? window.location.origin 
             : "http://127.0.0.1:5000";
@@ -112,8 +120,33 @@
         
         let mediaRecorder;
         let audioChunks = [];
+        const loaderScreen = document.getElementById('loader-screen');
+        const setupScreen = document.getElementById('setup-screen');
 
-        // ... (Le reste du script JavaScript est inchangé) ...
+        // --- GESTION DE LA VEILLE (COLD START UX) ---
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API_URL}/health`);
+                if (res.ok) {
+                    // Le serveur est chaud
+                    loaderScreen.style.opacity = '0';
+                    setTimeout(() => { loaderScreen.style.display = 'none'; }, 500);
+                    setupScreen.style.display = 'flex'; // Révéler le formulaire
+                } else {
+                    // Le serveur est en ligne mais répond bizarrement. On réessaie.
+                    setTimeout(checkHealth, 3000); 
+                }
+            } catch (e) {
+                // Le serveur est éteint (Cold Start). On réessaie.
+                setTimeout(checkHealth, 3000); 
+            }
+        }
+
+        window.onload = function() {
+            // Lancer le check au chargement de la page
+            checkHealth();
+        };
+        // --- FIN GESTION VEILLE ---
 
         // --- GESTION AVATAR (VIDEO SWAP) ---
         const vidIdle = document.getElementById('vid-idle');
@@ -122,22 +155,18 @@
         const audioIndicator = document.getElementById('audio-indicator');
 
         function initAvatar() {
-            // Tentative de lancement de la vidéo Idle
-            // On vérifie si la vidéo peut être jouée
             vidIdle.play().then(() => {
                 console.log("Avatar Vidéo Activé");
                 imgAvatar.style.display = 'none';
                 vidIdle.classList.remove('hidden');
             }).catch(e => {
                 console.warn("Autoplay vidéo bloqué ou fichier manquant. Fallback sur l'image.", e);
-                // Si ça échoue (fichier manquant ou blocage navigateur), on garde l'image
             });
         }
         
         function setAvatarState(isTalking) {
             audioIndicator.style.opacity = isTalking ? '1' : '0';
             
-            // Si le mode vidéo est actif (vidIdle est visible)
             if (!vidIdle.classList.contains('hidden') || !vidTalk.classList.contains('hidden')) {
                 if (isTalking) {
                     vidIdle.classList.add('hidden');
@@ -149,7 +178,6 @@
                     vidIdle.play();
                 }
             } else {
-                // Mode Image Fallback
                 if (isTalking) {
                     imgAvatar.classList.remove('breathing');
                     imgAvatar.classList.add('talking-img');
@@ -256,7 +284,6 @@
             document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
             document.getElementById('role-display').innerText = `Interviewing for ${job}`;
             
-            // Tentative d'activation de l'avatar vidéo
             initAvatar();
 
             try {
