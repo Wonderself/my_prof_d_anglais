@@ -1,8 +1,6 @@
 FROM python:3.11-slim
 
-# Installation des paquets systèmes nécessaires
-# libpq-dev est souvent nécessaire pour compiler psycopg2, mais avec -binary on s'en sort
-# ffmpeg est vital pour l'audio
+# Installation des paquets systèmes (FFmpeg + Pilotes DB)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     gcc \
@@ -11,15 +9,18 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Gestion optimisée du cache des dépendances
+# Installation des dépendances Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copie du code
+# Copie du code source
 COPY . .
 
-EXPOSE 5000
+# On n'expose pas de port fixe, on laisse Render décider
+# La variable d'environnement PORT est fournie par Render automatiquement
 
-# Gunicorn est le serveur de prod. 
-# Timeout augmenté car l'IA peut prendre du temps
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "8", "--timeout", "120", "english_coach_backend:app"]
+# COMMANDE DE DÉMARRAGE OPTIMISÉE
+# 1. On utilise "sh -c" pour que la variable $PORT soit bien lue (ex: 10000)
+# 2. On réduit les threads à 4 pour économiser la RAM (évite le crash mémoire)
+# 3. On ajoute --access-logfile - pour voir les requêtes dans les logs
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120 --access-logfile - --error-logfile - english_coach_backend:app"]
