@@ -3,164 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sarah - Job ITV Simulator</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
+    <title>Bienvenue - Identification</title>
     <style>
-        /* --- BASES --- */
-        * {
-            box-sizing: border-box;
-            font-family: 'Inter', sans-serif;
-        }
-
+        /* --- RESET & BODY --- */
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        
         body {
             margin: 0;
             padding: 0;
-            background-color: #f8f9fd;
-            /* CORRECTION CRITIQUE : min-height au lieu de height */
-            /* Cela permet de scroller si l'écran est trop petit */
-            min-height: 100vh; 
+            background-color: #f4f6f8;
+            height: 100vh; /* Prend toute la hauteur de l'écran */
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px; /* Marge de sécurité autour de l'écran */
+            align-items: center; /* Centre verticalement */
+            justify-content: center; /* Centre horizontalement */
+            
+            /* L'ASTUCE POUR REMONTER LE BLOC */
+            /* On ajoute du padding en bas, ce qui pousse le contenu vers le haut visuellement */
+            padding-bottom: 15vh; 
         }
 
-        /* --- CONTENEUR PRINCIPAL --- */
-        .container {
+        /* --- LA CARTE D'IDENTIFICATION --- */
+        .login-card {
             background: white;
-            width: 100%; /* Prend toute la largeur dispo */
-            max-width: 500px; /* MAIS s'arrête à 500px sur PC (Responsive Fix) */
+            width: 90%; /* Mobile : 90% de l'écran */
+            max-width: 400px; /* PC : Jamais plus large que 400px */
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); /* Ombre douce */
             text-align: center;
         }
 
-        /* --- HEADER --- */
-        .avatar {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin: 0 auto 15px auto;
-            display: block;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            margin: 0;
-            color: #1a1a1a;
-            font-size: 1.8rem;
-            font-weight: 700;
-        }
-
-        .subtitle {
-            color: #2563eb;
-            font-weight: 600;
-            font-size: 0.8rem;
-            margin-top: 5px;
+        .login-card h1 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.5rem;
             margin-bottom: 25px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
-        /* --- FORMULAIRE --- */
-        .form-group {
-            margin-bottom: 15px; /* Espace entre les blocs */
-            text-align: left;
+        /* --- LES CHAMPS (INPUTS) --- */
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left; /* Les labels restent à gauche */
         }
 
-        label {
+        .input-group label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             font-weight: 600;
-            font-size: 0.75rem;
-            color: #9ca3af;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.9rem;
+            color: #555;
         }
 
-        input[type="text"] {
+        .input-group input {
             width: 100%;
             padding: 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
             font-size: 1rem;
-            color: #1f2937;
-            background-color: #f9fafb;
-            transition: all 0.2s;
+            transition: border-color 0.3s;
         }
 
-        input[type="text"]:focus {
-            border-color: #2563eb;
-            background-color: white;
+        .input-group input:focus {
+            border-color: #007bff;
             outline: none;
         }
 
-        /* --- INPUT FILE (Retour au standard pour que ça marche) --- */
-        input[type="file"] {
-            width: 100%;
-            padding: 10px;
-            background: #f3f4f6;
-            border-radius: 8px;
-            font-size: 0.9rem;
-        }
-
-        /* --- BOUTON --- */
+        /* --- LE BOUTON --- */
         .btn-start {
             width: 100%;
-            padding: 15px;
-            background-color: #2563eb;
+            padding: 14px;
+            background-color: #007bff;
             color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: 600;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
             cursor: pointer;
             margin-top: 10px;
-            transition: background 0.2s;
+            transition: background 0.3s;
         }
 
         .btn-start:hover {
-            background-color: #1d4ed8;
+            background-color: #0056b3;
         }
+
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80" alt="Sarah" class="avatar">
+    <div class="login-card">
+        <h1>Bienvenue</h1>
         
-        <h1>Sarah</h1>
-        <div class="subtitle">Job ITV Simulator</div>
-
-        <form>
-            <div class="form-group">
-                <label for="name">Candidate Name</label>
-                <input type="text" id="name" value="Alex">
+        <form id="loginForm">
+            
+            <div class="input-group">
+                <label for="username">Votre Nom</label>
+                <input type="text" id="username" placeholder="Ex: Emmanuel Smadja" required>
             </div>
 
-            <div class="form-group">
-                <label for="role">Target Role</label>
-                <input type="text" id="role" value="Product Manager">
+            <div class="input-group">
+                <label for="role">Votre Poste</label>
+                <input type="text" id="role" placeholder="Ex: CEO" required>
             </div>
 
-            <div class="form-group">
-                <label for="context">Company Context</label>
-                <input type="text" id="context" value="Tech Startup">
+            <div class="input-group">
+                <label for="company">Votre Entreprise</label>
+                <input type="text" id="company" placeholder="Ex: Light Bros" required>
             </div>
 
-            <div class="form-group">
-                <label for="cv">Upload CV (Optionnel)</label>
-                <input type="file" id="cv" accept=".pdf,.doc,.docx,.txt">
-            </div>
-
-            <button type="submit" class="btn-start">Start Interview ></button>
+            <button type="submit" class="btn-start">Commencer</button>
+            
         </form>
     </div>
+
+    <script>
+        // SCRIPT MINIMAL POUR QUE LE BOUTON FASSE QUELQUE CHOSE
+        // (Tu pourras remplacer ça par ta vraie logique plus tard)
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // Empêche la page de se recharger
+            
+            const nom = document.getElementById('username').value;
+            const poste = document.getElementById('role').value;
+            const boite = document.getElementById('company').value;
+
+            // Pour l'instant, ça affiche juste une alerte pour confirmer que ça marche
+            alert("Bienvenue " + nom + " ! \nPoste : " + poste + "\nBoîte : " + boite);
+            
+            // ICI : Tu mettras le code pour aller vers la page suivante
+            // Ex: window.location.href = 'page-suivante.html';
+        });
+    </script>
 
 </body>
 </html>
