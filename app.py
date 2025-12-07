@@ -9,15 +9,13 @@ import requests
 from urllib.parse import quote 
 
 # --- CONFIG (CLOUD) ---
-# Sur Render, les variables sont injectées directement par le dashboard.
 API_KEY = os.getenv("GOOGLE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 MODEL_NAME = 'gemini-1.5-flash' 
 COACH_NAME = 'Sarah'
 
-# Vérification silencieuse (pour éviter de faire crasher le build si les vars arrivent après)
 if not API_KEY or not DATABASE_URL:
-    print("⚠️ WARNING: API Keys not found via os.getenv. Ensure they are set in Render Dashboard.")
+    print("⚠️ WARNING: Keys missing. Ensure they are set in Render Dashboard.")
 
 try:
     if API_KEY: genai.configure(api_key=API_KEY)
@@ -51,18 +49,42 @@ init_db()
 # --- AUDIO & AI ---
 def generate_tts(text):
     try:
-        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:1000])}"
+        # TTS Google rapide et gratuit (Fallback robuste)
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:500])}"
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
         if r.status_code == 200: return base64.b64encode(r.content).decode('utf-8')
     except: pass
     return None
 
-def get_prompt(name, job, company, cv):
-    cv_txt = f"\nCV INFO:\n{cv[:4000]}" if cv else ""
-    return (f"ROLE: Recruiter {COACH_NAME} at {company}. Interviewing {name} for {job}.{cv_txt}\n"
-            "STYLE: 1 short question at a time. Tough. Detect grammar errors.\n"
-            "JSON OUTPUT: {coach_response_text, transcription_user, score_pronunciation (0-10), "
-            "feedback_grammar, better_response_example, next_step_advice}")
+def get_prompt(name, job, company, cv, history_len):
+    """
+    Prompt Engineering Avancé pour structurer l'entretien et forcer l'usage du CV.
+    """
+    # Détection approximative de l'étape de l'entretien basée sur la longueur de l'historique
+    stage = "INTRODUCTION"
+    if history_len > 2: stage = "DEEP DIVE EXPERIENCE (Challenge the CV)"
+    if history_len > 6: stage = "HARD SKILLS & TECHNICAL"
+    if history_len > 10: stage = "SOFT SKILLS & BEHAVIORAL"
+    if history_len > 14: stage = "CLOSING"
+
+    cv_context = f"\n=== CANDIDATE CV (CRITICAL SOURCE) ===\n{cv[:5000]}\n=== END CV ===\n" if cv else ""
+    
+    return (
+        f"ROLE: You are {COACH_NAME}, an expert recruiter at {company}. Interviewing {name} for {job}.\n"
+        f"CURRENT STAGE: {stage}.\n"
+        f"{cv_context}"
+        f"GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
+        f"RULES:\n"
+        f"1. Ask ONE short question at a time (max 15 words).\n"
+        f"2. Do NOT be repetitive. Follow the flow: Intro -> Exp -> Tech -> Closing.\n"
+        f"3. AUDIO ANALYSIS: The user sends audio transcription. Detect grammar mistakes.\n"
+        f"4. MASTERCLASS LOGIC (CRITICAL): When generating 'better_response_example', YOU MUST USE FACTS FROM THE CV provided above. "
+        f"Do not give generic advice. Rewrite the user's answer to be a 'Perfect Answer' using their specific dates, companies, and achievements found in the CV text.\n"
+        f"JSON OUTPUT FORMAT: {{'coach_response_text': 'Your spoken question', 'transcription_user': 'User text', "
+        f"'score_pronunciation': 0-10, 'feedback_grammar': 'Correction', "
+        f"'better_response_example': 'The MASTERCLASS answer using CV details', "
+        f"'next_step_advice': 'Short tip'}}"
+    )
 
 # --- ROUTES ---
 @app.route('/')
@@ -75,7 +97,6 @@ def health(): return jsonify({"status": "alive"})
 def start_chat():
     d = request.json
     sid = d.get('session_id')
-    # Save session
     conn = get_db_connection()
     if conn:
         cur = conn.cursor()
@@ -84,7 +105,7 @@ def start_chat():
         conn.commit()
         conn.close()
     
-    msg = f"Hello {d.get('candidate_name')}. I'm {COACH_NAME}. Tell me about yourself."
+    msg = f"Hello {d.get('candidate_name')}. I'm {COACH_NAME}. I've reviewed your CV. Let's start. Briefly introduce yourself."
     return jsonify({"coach_response_text": msg, "audio_base64": generate_tts(msg), "transcription_user": ""})
 
 @app.route('/analyze', methods=['POST'])
@@ -93,7 +114,6 @@ def analyze():
     f = request.files.get('audio')
     if not f or not sid: return jsonify({"error": "No audio"}), 400
 
-    # 1. Save temp file
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         f.save(tmp.name)
         webm_path = tmp.name
@@ -101,31 +121,37 @@ def analyze():
     mp3_path = webm_path + ".mp3"
     
     try:
-        # 2. Convert to MP3 (FFmpeg via Docker)
         AudioSegment.from_file(webm_path).export(mp3_path, format="mp3")
         
-        # 3. Get Context
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
         sess = cur.fetchone()
-        cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id DESC LIMIT 10", (sid,))
+        cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC", (sid,)) # On prend tout pour le contexte
         hist_rows = cur.fetchall()
         conn.close()
 
-        hist = [{"role": r['role'], "parts": [r['content']]} for r in reversed(hist_rows)]
+        # On garde les 10 derniers échanges pour le contexte immédiat
+        hist = [{"role": r['role'], "parts": [r['content']]} for r in hist_rows[-10:]]
+        history_len = len(hist_rows) # On utilise la longueur totale pour savoir où on en est dans l'ITV
         
-        # 4. Gemini
-        model = genai.GenerativeModel(MODEL_NAME, system_instruction=get_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content']))
+        sys_prompt = get_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], history_len)
+        
+        model = genai.GenerativeModel(MODEL_NAME, system_instruction=sys_prompt)
         chat = model.start_chat(history=hist)
         
         uf = genai.upload_file(mp3_path, mime_type="audio/mp3")
-        while uf.state.name == "PROCESSING": time.sleep(1); uf = genai.get_file(uf.name)
+        while uf.state.name == "PROCESSING": time.sleep(0.5); uf = genai.get_file(uf.name)
         
-        resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
-        data = json.loads(resp.text)
+        resp = chat.send_message([uf, "Analyze this response."], generation_config={"response_mime_type": "application/json"})
         
-        # 5. Save & TTS
+        try:
+            data = json.loads(resp.text)
+        except:
+            # Fallback nettoyage markdown
+            clean = resp.text.replace('```json', '').replace('```', '').strip()
+            data = json.loads(clean)
+        
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s)", (sid, data.get('transcription_user','')))
@@ -144,6 +170,5 @@ def analyze():
         if os.path.exists(mp3_path): os.remove(mp3_path)
 
 if __name__ == '__main__':
-    # C'EST ICI QUE LA MAGIE OPÈRE POUR RENDER
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
