@@ -32,7 +32,7 @@
     </div>
 
     <div id="setup-screen" class="fixed inset-0 bg-white z-50 flex flex-col p-6 transition-transform duration-500 ease-in-out" style="display:none;">
-        <div class="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
+        <div class="flex-1 flex flex-col justify-center max-w-md mx-auto w-full md:max-w-xl lg:max-w-2xl">
             <div class="mb-6 text-center">
                 <div class="w-28 h-28 rounded-full mx-auto mb-5 shadow-lg border-4 border-white overflow-hidden relative bg-slate-100">
                     <video src="idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
@@ -70,7 +70,7 @@
 
             </div>
 
-            <button onclick="startSession()" class="mt-6 w-full bg-blue-600 text-white p-4 rounded-xl font-bold text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
+            <button onclick="event.preventDefault();startSession()" class="mt-6 w-full bg-blue-600 text-white p-4 rounded-xl font-bold text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
                 Start Interview <i class="fas fa-arrow-right"></i>
             </button>
         </div>
@@ -126,7 +126,6 @@
         const chatBox = document.getElementById('chat-box');
         const loaderScreen = document.getElementById('loader-screen');
 
-
         // --- PARTIE 1: LOGIQUE CV ---
         function readCVFile() {
             const fileInput = document.getElementById('inp-cv');
@@ -142,8 +141,7 @@
                 return;
             }
 
-            // GESTION TAILLE/FORMAT
-            if (file.size > 1024 * 1024 * 1) { // 1MB Max (limite de prompt raisonnable)
+            if (file.size > 1024 * 1024 * 1) { // 1MB Max
                 status.innerText = "Fichier trop volumineux (Max 1MB)";
                 status.classList.add('text-red-500');
                 fileInput.value = "";
@@ -155,9 +153,6 @@
             const isDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
             const isPdf = fileName.endsWith('.pdf');
             
-            // NOTE IMPORTANTE: La lecture de PDF/DOCX côté client est complexe (besoin de librairies externes).
-            // Pour l'efficacité, nous lisons tous les fichiers en tant que TEXTE. Gemini est excellent pour ignorer le bruit.
-            // Si c'est un DOCX/PDF, l'utilisateur doit être averti que la qualité de l'extraction de texte sera faible.
             if (isDoc || isPdf) {
                  status.innerText = "⚠️ Lecture fichier complexe. Précision faible.";
                  status.classList.add('text-orange-500');
@@ -166,20 +161,16 @@
             }
             
             const reader = new FileReader();
-
             reader.onload = function(e) {
                 cvContent.value = e.target.result;
                 status.innerText = `Fichier chargé (${(file.size / 1024).toFixed(0)} KB)`;
                 status.classList.remove('text-red-500');
                 status.classList.add('text-green-600');
             };
-
             reader.onerror = function() {
                 status.innerText = "Erreur de lecture du fichier.";
                 status.classList.add('text-red-500');
             };
-            
-            // Lecture en tant que texte brut
             reader.readAsText(file);
         }
         
@@ -187,6 +178,8 @@
         function returnToSetup() {
             if (confirm("Êtes-vous sûr de vouloir mettre fin à cette session et revenir au formulaire ?")) {
                 document.getElementById('setup-screen').style.transform = 'translateY(0)';
+                document.getElementById('setup-screen').style.display = 'flex'; // Re-afficher
+                
                 sessionId = 'sess_' + Date.now();
                 localStorage.setItem('coach_sess', sessionId);
                 chatBox.innerHTML = '';
@@ -212,7 +205,7 @@
             checkHealth();
         };
 
-        // --- GESTION AVATAR / LECTURE / MICRO (INCHANGÉ) ---
+        // --- GESTION AVATAR / LECTURE / MICRO ---
         const vidIdle = document.getElementById('vid-idle');
         const vidTalk = document.getElementById('vid-talk');
         const imgAvatar = document.getElementById('avatar-img');
@@ -297,10 +290,16 @@
             const company = document.getElementById('inp-company').value;
             const cvContent = document.getElementById('cv-content').value;
             
+            // 1. Initialiser la transition
             document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
             document.getElementById('role-display').innerText = `Interviewing for ${job}`;
             
             initAvatar();
+
+            // 2. Cacher l'écran APRÈS la transition (FIX GHOST BUTTON)
+            setTimeout(() => {
+                 document.getElementById('setup-screen').style.display = 'none';
+            }, 500);
 
             try {
                 const res = await fetch(`${API_URL}/start_chat`, {
@@ -311,7 +310,7 @@
                         candidate_name: name, 
                         job_title: job, 
                         company_type: company,
-                        cv_content: cvContent // ENVOI DU CV
+                        cv_content: cvContent 
                     })
                 });
                 const data = await res.json();
@@ -322,7 +321,13 @@
                 initMic();
             } catch (e) {
                 alert("Server Error: " + e);
-                document.getElementById('setup-screen').style.transform = 'translateY(0)';
+                // Si le serveur échoue, on remonte le setup
+                const setup = document.getElementById('setup-screen');
+                setup.style.display = 'flex';
+                // Petit délai pour permettre au display:flex d'être pris en compte avant l'anim
+                requestAnimationFrame(() => {
+                    setup.style.transform = 'translateY(0)';
+                });
             }
         }
 
