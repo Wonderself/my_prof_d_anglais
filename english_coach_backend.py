@@ -102,7 +102,7 @@ def get_sess(sid):
         return row
     except: return None
 
-# --- AUDIO G-TTS (Robuste) ---
+# --- AUDIO G-TTS (Robuste - Plan B) ---
 def generate_ai_voice(text):
     """Utilise l'API Google Translate TTS pour garantir l'audio."""
     try:
@@ -180,8 +180,9 @@ def start_chat():
     
     cv_content = d.get('cv_content', None) 
     
-    # FIX CRITIQUE: Retire les caractères NUL (0x00) pour éviter les erreurs PostgreSQL
+    # FIX CRITIQUE: Retire les caractères NUL (0x00) qui font planter PostgreSQL
     if cv_content:
+        # On remplace les bytes nuls par rien pour nettoyer la string
         cv_content = cv_content.replace('\x00', '') 
     
     conn = get_db_connection()
