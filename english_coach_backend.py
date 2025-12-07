@@ -20,7 +20,8 @@ if not DATABASE_URL: sys.exit("❌ DATABASE_URL MANQUANTE (Nécessaire pour Post
 
 try:
     genai.configure(api_key=API_KEY.strip())
-    MODEL_NAME = 'gemini-2.5-flash'
+    # CORRECTION 1: Utilisation de 2.5 pour assurer la compatibilité
+    MODEL_NAME = 'gemini-2.5-flash' 
 except: sys.exit("❌ ERREUR CONFIG GEMINI")
 
 app = Flask(__name__, static_folder='.', static_url_path='')
@@ -188,6 +189,7 @@ def start_chat():
 
     msg = f"Hi {d['candidate_name']}. I'm Mike. Let's start the interview for {d['job_title']}. Tell me about yourself."
     save_msg(sid, "model", msg)
+    # L'audio est généré et renvoyé, c'est ce qui doit faire parler le coach
     return jsonify({"coach_response_text": msg, "audio_base64": generate_ai_voice(msg), "transcription_user": "", "score_pronunciation": 10, "feedback_grammar": "", "better_response_example": "N/A"})
 
 @app.route('/analyze', methods=['POST'])
@@ -218,8 +220,8 @@ def analyze():
     except: return jsonify({"error": "Erreur fichier audio"}), 500
 
     try:
-        # Call Gemini
-        model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=get_sys_prompt(sess['candidate_name'], sess['job_title'], sess['company_type']))
+        # Call Gemini (CORRECTION 2: Utilisation de la variable MODEL_NAME)
+        model = genai.GenerativeModel(MODEL_NAME, system_instruction=get_sys_prompt(sess['candidate_name'], sess['job_title'], sess['company_type']))
         
         # Get history from DB
         hist = get_hist(sid)
