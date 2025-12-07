@@ -1,4 +1,4 @@
-import os, sys, tempfile, json, datetime, time, shutil, base64
+import os, sys, tempfile, json, time, shutil, base64
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -9,43 +9,37 @@ from psycopg2.extras import RealDictCursor
 import requests 
 from urllib.parse import quote 
 
-# --- CONFIGURATION INITIALE ---
+# --- CONFIGURATION ---
 load_dotenv(override=True)
 
 API_KEY = os.getenv("GOOGLE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL") 
-MODEL_NAME = 'gemini-2.5-flash' 
+MODEL_NAME = 'gemini-2.0-flash-exp' # Or 'gemini-1.5-flash' depending on availability
 COACH_NAME = 'Sarah' 
 
-if not API_KEY: sys.exit("❌ CLÉ GEMINI MANQUANTE")
-if not DATABASE_URL: sys.exit("❌ DATABASE_URL MANQUANTE")
+if not API_KEY: sys.exit("❌ MISSING GOOGLE_API_KEY")
+if not DATABASE_URL: sys.exit("❌ MISSING DATABASE_URL")
 
 try:
     genai.configure(api_key=API_KEY.strip())
-except Exception as e: sys.exit(f"❌ ERREUR CONFIG GEMINI: {e}")
+except Exception as e: sys.exit(f"❌ GEMINI CONFIG ERROR: {e}")
 
-# Initialisation de l'application Flask
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# --- GESTION DE LA BASE DE DONNÉES (POSTGRES) ---
+# --- DATABASE ---
 def get_db_connection():
-    """Crée et retourne une connexion à PostgreSQL."""
     try:
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     except Exception as e:
-        print(f"⚠️ Erreur DB: {e}")
+        print(f"⚠️ DB Connection Error: {e}")
         return None
 
 def init_db():
-    """Initialise les tables si elles n'existent pas."""
     conn = get_db_connection()
-    if not conn: 
-        print("❌ Impossible d'initialiser la DB, connexion échouée.")
-        return
+    if not conn: return
     try:
         cur = conn.cursor()
-        # SCHEMA MIS À JOUR : Ajout de cv_content
         cur.execute('''
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
@@ -56,30 +50,35 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ''')
-        cur.execute('''CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS history (
+                id SERIAL PRIMARY KEY, 
+                session_id TEXT, 
+                role TEXT, 
+                content TEXT, 
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ''')
         conn.commit()
         conn.close()
-        print("✅ DB Initialisée (Schema V4.0)")
+        print("✅ DB Initialized (V4.1)")
     except Exception as e: 
-        print(f"❌ Erreur Init DB: {e}")
+        print(f"❌ Init DB Error: {e}")
 
 init_db()
 
-# --- Fonctions de l'Historique ---
-
+# --- HELPERS ---
 def save_msg(sid, role, txt):
-    """Enregistre un message dans l'historique."""
     conn = get_db_connection()
     if not conn: return
     try:
         cur = conn.cursor()
-        cur.execute("INSERT INTO history (session_id, role, content, timestamp) VALUES (%s, %s, %s, NOW())", (sid, role, txt))
+        cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, %s, %s)", (sid, role, txt))
         conn.commit()
         conn.close()
     except Exception as e: print(f"Save Error: {e}")
 
 def get_hist(sid):
-    """Récupère l'historique pour Gemini (20 dernières entrées)."""
     conn = get_db_connection()
     if not conn: return []
     try:
@@ -87,11 +86,15 @@ def get_hist(sid):
         cur.execute("SELECT role, content FROM history WHERE session_id = %s ORDER BY id ASC", (sid,))
         rows = cur.fetchall()
         conn.close()
-        return [{"role": r['role'], "parts": [r['content']]} for r in rows[-20:]]
+        # Ensure we only send valid Gemini roles (user/model)
+        valid_hist = []
+        for r in rows[-20:]: # Limit context window
+            gemini_role = "user" if r['role'] == "user" else "model"
+            valid_hist.append({"role": gemini_role, "parts": [r['content']]})
+        return valid_hist
     except: return []
 
 def get_sess(sid):
-    """Récupère les détails de la session."""
     conn = get_db_connection()
     if not conn: return None
     try:
@@ -102,110 +105,122 @@ def get_sess(sid):
         return row
     except: return None
 
-# --- AUDIO G-TTS (Robuste - Plan B) ---
 def generate_ai_voice(text):
-    """Utilise l'API Google Translate TTS pour garantir l'audio."""
+    """Google Translate TTS as fallback"""
     try:
-        # Nettoyage et encodage du texte pour l'URL
         clean_text = text.replace('\n', ' ').strip()
         encoded_text = quote(clean_text)
-        
-        # Endpoint public TTS (tl=en pour l'anglais)
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={encoded_text}"
-        
-        # Appel API simple (synchrone, pas de processus asynchrone qui plante)
         response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response.raise_for_status() # Lève une exception si le statut n'est pas 200
-        
-        # Conversion en Base64
-        b64 = base64.b64encode(response.content).decode('utf-8')
-        return b64
-        
+        response.raise_for_status()
+        return base64.b64encode(response.content).decode('utf-8')
     except Exception as e:
-        print(f"❌ CRITIQUE: Échec Audio G-TTS: {e}")
+        print(f"TTS Error: {e}")
         return "" 
 
-# --- LOGIQUE GEMINI (Masterclass) ---
-
 def clean_json(text):
-    """Nettoie le bloc de code Markdown autour du JSON de Gemini."""
     t = text.strip()
     if t.startswith("`" * 3):
         lines = t.split('\n')
         if len(lines) > 2: return "\n".join(lines[1:-1]).strip()
     return t
 
+# --- PROMPT LOGIC ---
 def get_sys_prompt(name, job, company, cv_content=None):
-    """Crée l'instruction système pour Gemini avec injection du CV."""
-    cv_injection = ""
-    if cv_content and cv_content.strip():
-        cv_injection = (
-            f"CONTEXTE CLÉ: Le CV/Résumé de {name} est fourni ci-dessous. "
-            f"Utilisez les expériences, compétences et réalisations listées dans ce CV pour améliorer la qualité et la pertinence de tous les exemples de 'better_response_example' que vous fournirez. "
-            f"Assurez-vous que les réponses modèles (masterclass) sont directement liées au CV. \n"
-            f"--- CV FOURNI ---\n{cv_content}\n"
-            f"--- FIN CV ---\n"
+    
+    cv_context = ""
+    if cv_content and len(cv_content) > 10:
+        cv_context = (
+            f"IMPORTANT CONTEXT: The candidate's Resume/CV is provided below. "
+            f"Use the specific details (skills, past companies, achievements) from this CV to ask relevant questions "
+            f"and to generate the 'better_response_example'.\n"
+            f"--- START CV ---\n{cv_content}\n--- END CV ---\n"
         )
     
     return (
-        f"ROLE: Coach {COACH_NAME}, recruiter at {company}. Interviewing {name} for {job}.\n"
-        f"STYLE: Short questions (1-2 sentences MAX). One at a time. Tough on English.\n"
-        f"{cv_injection}"
-        f"OUTPUT: JSON with fields: coach_response_text, transcription_user, score_pronunciation (0-10), feedback_intonation, feedback_grammar, better_response_example, next_step_advice."
+        f"You are {COACH_NAME}, a professional recruiter at {company}. "
+        f"You are interviewing {name} for the position of {job}.\n\n"
+        f"{cv_context}\n"
+        f"RULES:\n"
+        f"1. Ask ONE concise question at a time (max 2 sentences).\n"
+        f"2. Be professional but challenging.\n"
+        f"3. Language: ENGLISH ONLY.\n"
+        f"4. OUTPUT FORMAT: JSON Only.\n\n"
+        f"JSON SCHEMA:\n"
+        f"{{"
+        f"  'coach_response_text': 'Your next question or reaction',"
+        f"  'transcription_user': 'What the user said (transcribed)',"
+        f"  'score_pronunciation': Number (0-10),"
+        f"  'feedback_intonation': 'Brief comment on tone',"
+        f"  'feedback_grammar': 'Fix English mistakes if any, else empty string',"
+        f"  'better_response_example': 'An ideal, professional answer the candidate COULD have given based on their CV/Context',"
+        f"  'next_step_advice': 'A quick tip for the next answer'"
+        f"}}"
     )
 
-SCHEMA = {"type": "OBJECT", "properties": {
-    "coach_response_text": {"type": "STRING"}, "transcription_user": {"type": "STRING"},
-    "score_pronunciation": {"type": "NUMBER"}, "feedback_intonation": {"type": "STRING"},
-    "feedback_grammar": {"type": "STRING"}, "better_response_example": {"type": "STRING"},
-    "next_step_advice": {"type": "STRING"}},
-    "required": ["coach_response_text", "transcription_user", "score_pronunciation", "better_response_example"]}
+SCHEMA = {
+    "type": "OBJECT", 
+    "properties": {
+        "coach_response_text": {"type": "STRING"}, 
+        "transcription_user": {"type": "STRING"},
+        "score_pronunciation": {"type": "NUMBER"}, 
+        "feedback_grammar": {"type": "STRING"}, 
+        "better_response_example": {"type": "STRING"}, 
+        "next_step_advice": {"type": "STRING"}
+    },
+    "required": ["coach_response_text", "score_pronunciation", "better_response_example"]
+}
 
-# --- ROUTES FLASK ---
+# --- ROUTES ---
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')
 
-@app.route('/health', methods=['GET'])
+@app.route('/health')
 def health():
     conn = get_db_connection()
-    status = "ok" if conn else "disconnected"
+    status = "ok" if conn else "error"
     if conn: conn.close()
-    return jsonify({"status": "ok", "db": status})
+    return jsonify({"status": status})
 
 @app.route('/start_chat', methods=['POST'])
 def start_chat():
     d = request.json
     sid = d.get('session_id')
     
-    cv_content = d.get('cv_content', None) 
-    
-    # FIX CRITIQUE: Retire les caractères NUL (0x00) qui font planter PostgreSQL
-    if cv_content:
-        # On remplace les bytes nuls par rien pour nettoyer la string
-        cv_content = cv_content.replace('\x00', '') 
-    
+    # sanitize CV Content to remove Null Bytes which crash Postgres
+    raw_cv = d.get('cv_content', '')
+    if raw_cv:
+        raw_cv = raw_cv.replace('\x00', '').strip()
+
     conn = get_db_connection()
     if conn:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO sessions (session_id, candidate_name, job_title, company_type, cv_content, created_at)
-            VALUES (%s, %s, %s, %s, %s, NOW())
+            INSERT INTO sessions (session_id, candidate_name, job_title, company_type, cv_content)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (session_id) DO UPDATE 
             SET candidate_name = EXCLUDED.candidate_name, 
                 job_title = EXCLUDED.job_title, 
                 company_type = EXCLUDED.company_type,
                 cv_content = EXCLUDED.cv_content
-        """, (sid, d['candidate_name'], d['job_title'], d['company_type'], cv_content))
+        """, (sid, d['candidate_name'], d['job_title'], d['company_type'], raw_cv))
         conn.commit()
         conn.close()
 
-    msg = f"Hi {d['candidate_name']}. I'm {COACH_NAME}. Let's start the interview for {d['job_title']}. Tell me about yourself."
-    save_msg(sid, "model", msg)
+    first_msg = f"Hello {d['candidate_name']}. Thank you for joining. I've reviewed your application for the {d['job_title']} role. Tell me, can you briefly introduce yourself?"
     
-    audio = generate_ai_voice(msg)
+    # If CV provided, make the intro more specific
+    if raw_cv:
+        first_msg = f"Hello {d['candidate_name']}. I have your CV in front of me. To start, could you walk me through your relevant experience for this {d['job_title']} position?"
+
+    save_msg(sid, "model", first_msg)
+    audio = generate_ai_voice(first_msg)
     
-    return jsonify({"coach_response_text": msg, "audio_base64": audio, "transcription_user": "", "score_pronunciation": 10, "feedback_grammar": "", "better_response_example": "N/A"})
+    return jsonify({
+        "coach_response_text": first_msg, 
+        "audio_base64": audio
+    })
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
@@ -213,18 +228,17 @@ def analyze():
     f = request.files.get('audio')
     
     sess = get_sess(sid)
-    if not sess: return jsonify({"error": "Session lost"}), 404
+    if not sess: return jsonify({"error": "Session not found"}), 404
 
-    # Utiliser le CV sauvegardé pour le prompt
-    cv_for_prompt = sess['cv_content'] 
-
-    # 1. Traitement audio (inchangé)
+    # 1. Process Audio
     path, mime = None, "video/webm"
     try:
         fd, t_webm = tempfile.mkstemp(suffix=".webm")
         os.close(fd)
         f.save(t_webm)
         path = t_webm
+        
+        # Convert if ffmpeg available (Gemini prefers mp3/wav sometimes)
         if shutil.which("ffmpeg"):
             try:
                 fd2, t_mp3 = tempfile.mkstemp(suffix=".mp3")
@@ -232,12 +246,11 @@ def analyze():
                 AudioSegment.from_file(t_webm).export(t_mp3, format="mp3")
                 path, mime = t_mp3, "audio/mp3"
             except: pass
-    except: return jsonify({"error": "File error"}), 500
+    except: return jsonify({"error": "Audio processing failed"}), 500
 
-    # 2. Appel à Gemini
+    # 2. Gemini
     try:
-        # Passation du CV au prompt
-        sys_prompt = get_sys_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], cv_content=cv_for_prompt)
+        sys_prompt = get_sys_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], cv_content=sess['cv_content'])
         model = genai.GenerativeModel(MODEL_NAME, system_instruction=sys_prompt)
         
         hist = get_hist(sid)
@@ -245,16 +258,15 @@ def analyze():
         
         u_file = genai.upload_file(path, mime_type=mime)
         
-        retry = 0
-        while u_file.state.name == "PROCESSING" and retry < 10: 
+        # Wait for processing
+        for _ in range(10):
+            if u_file.state.name == "ACTIVE": break
             time.sleep(0.5)
             u_file = genai.get_file(u_file.name)
-            retry += 1
             
-        if u_file.state.name != "ACTIVE": raise Exception("Gemini File Upload Failed")
+        resp = chat.send_message([u_file, "Listen to the answer and respond in JSON."], generation_config=genai.GenerationConfig(response_mime_type="application/json", response_schema=SCHEMA))
         
-        resp = chat.send_message([u_file, "Analyze."], generation_config=genai.GenerationConfig(response_mime_type="application/json", response_schema=SCHEMA))
-        
+        # Cleanup
         try:
             genai.delete_file(u_file.name)
             os.remove(t_webm)
@@ -262,14 +274,17 @@ def analyze():
         except: pass
 
         res = json.loads(clean_json(resp.text))
-        save_msg(sid, "user", res.get("transcription_user", "..."))
+        
+        # Save to DB
+        save_msg(sid, "user", res.get("transcription_user", "(Audio)"))
         save_msg(sid, "model", res.get("coach_response_text", ""))
         
         res["audio_base64"] = generate_ai_voice(res.get("coach_response_text"))
         
         return jsonify(res)
+        
     except Exception as e:
-        print(f"CRITICAL: {e}")
+        print(f"CRITICAL GEMINI ERROR: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
