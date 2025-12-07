@@ -105,7 +105,9 @@
     </footer>
 
     <script>
-        const API_URL = "http://127.0.0.1:5000";
+        const API_URL = window.location.protocol === 'https:' 
+    ? window.location.origin 
+    : "http://127.0.0.1:5000";
         let sessionId = localStorage.getItem('coach_sess') || 'sess_' + Date.now();
         localStorage.setItem('coach_sess', sessionId);
         
