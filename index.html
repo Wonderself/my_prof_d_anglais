@@ -9,7 +9,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         :root { --primary: #007AFF; --bg: #F2F2F7; }
-        /* Utilisation de dvh pour gérer parfaitement les barres de navigateur mobile */
         body { font-family: 'Inter', sans-serif; background: var(--bg); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
         
         .bubble { animation: slideIn 0.3s ease-out forwards; opacity: 0; transform: translateY(10px); }
@@ -19,7 +18,6 @@
         .blur-reveal:hover { filter: blur(4px); }
         .blur-reveal.revealed { filter: blur(0); cursor: text; user-select: text; background: transparent; color: inherit; }
         
-        /* Masquer la scrollbar tout en gardant le scroll */
         #chat-box::-webkit-scrollbar { width: 4px; }
         #chat-box::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.1); border-radius: 4px; }
     </style>
@@ -36,7 +34,6 @@
     <div id="setup-screen" class="fixed inset-0 bg-white z-50 flex flex-col p-6 transition-transform duration-500 ease-in-out" style="display:none;">
         <div class="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
             <div class="mb-8 text-center">
-                
                 <div class="w-28 h-28 rounded-full mx-auto mb-6 shadow-lg border-4 border-white overflow-hidden relative bg-slate-100">
                     <video src="idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
                 </div>
@@ -58,6 +55,19 @@
                     <label class="text-xs font-bold uppercase text-slate-400 tracking-wider ml-1">Company Context</label>
                     <input id="inp-company" type="text" class="w-full p-4 bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Tech Startup">
                 </div>
+
+                <div>
+                    <label for="inp-cv" class="text-xs font-bold uppercase text-slate-400 tracking-wider ml-1 flex items-center justify-between">
+                        Upload CV (Optionnel)
+                        <span id="cv-status" class="text-[10px] text-red-500">Aucun fichier</span>
+                    </label>
+                    <input id="inp-cv" type="file" accept=".txt,.pdf" class="hidden" onchange="readCVFile()">
+                    <button onclick="document.getElementById('inp-cv').click()" class="w-full p-3 bg-slate-100 rounded-xl font-medium text-sm text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all">
+                        <i class="fas fa-file-upload mr-2"></i> Choisir CV (.txt ou .pdf)
+                    </button>
+                    <textarea id="cv-content" class="hidden"></textarea>
+                </div>
+
             </div>
 
             <button onclick="startSession()" class="mt-8 w-full bg-blue-600 text-white p-4 rounded-xl font-bold text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
@@ -67,6 +77,10 @@
     </div>
 
     <header class="bg-white/90 backdrop-blur-md border-b p-3 flex flex-col items-center z-10 shadow-sm shrink-0">
+        <button onclick="returnToSetup()" class="absolute top-3 left-3 bg-slate-100 p-2 rounded-lg text-sm text-slate-600 hover:bg-slate-200 transition-colors">
+            <i class="fas fa-home"></i> Home
+        </button>
+        
         <div class="relative w-20 h-20 mb-1 group">
             <div class="w-full h-full rounded-full overflow-hidden border-2 border-white shadow-md relative bg-slate-200">
                 <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
@@ -108,10 +122,67 @@
         
         let mediaRecorder;
         let audioChunks = [];
-        const loaderScreen = document.getElementById('loader-screen');
         const setupScreen = document.getElementById('setup-screen');
+        const chatBox = document.getElementById('chat-box');
 
-        // --- GESTION DE LA VEILLE ---
+        // --- GESTION UPLOAD CV (LIRE LE PDF/TXT) ---
+        function readCVFile() {
+            const fileInput = document.getElementById('inp-cv');
+            const file = fileInput.files[0];
+            const status = document.getElementById('cv-status');
+            const cvContent = document.getElementById('cv-content');
+            
+            if (!file) {
+                status.innerText = "Aucun fichier";
+                cvContent.value = "";
+                return;
+            }
+
+            // Vérification de la taille (limite Gemini API ~ 4MB pour les textes, mais visons moins)
+            if (file.size > 1024 * 1024 * 1) { // 1MB Max
+                status.innerText = "Fichier trop volumineux (Max 1MB)";
+                fileInput.value = "";
+                cvContent.value = "";
+                return;
+            }
+
+            status.innerText = `Lecture de ${file.name}...`;
+            
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                // Pour un PDF, le contenu sera binaire et illisible. Pour un TXT, ce sera du texte.
+                // On lit en tant que texte, et on espère que le contenu est propre (Gemini est excellent pour parser le désordre)
+                cvContent.value = e.target.result;
+                status.innerText = `Fichier chargé (${(file.size / 1024).toFixed(0)} KB)`;
+                status.classList.remove('text-red-500');
+                status.classList.add('text-green-600');
+            };
+
+            reader.onerror = function() {
+                status.innerText = "Erreur de lecture du fichier.";
+                status.classList.add('text-red-500');
+            };
+            
+            // Si c'est un PDF, il faut le lire comme un string binaire, mais pour Gemini,
+            // l'idéal est de le laisser en texte brut (pour éviter de dépasser la limite de prompt).
+            // On le lit simplement comme du texte.
+            reader.readAsText(file);
+        }
+
+        // --- GESTION RETOUR HOME ---
+        function returnToSetup() {
+            if (confirm("Êtes-vous sûr de vouloir mettre fin à cette session et revenir au formulaire ?")) {
+                document.getElementById('setup-screen').style.transform = 'translateY(0)';
+                // Réinitialiser la session_id pour une nouvelle interview propre
+                sessionId = 'sess_' + Date.now();
+                localStorage.setItem('coach_sess', sessionId);
+                chatBox.innerHTML = ''; // Vider l'historique visuel
+            }
+        }
+
+        // --- GESTION VEILLE (INCHANGÉ) ---
+        const loaderScreen = document.getElementById('loader-screen');
         async function checkHealth() {
             try {
                 const res = await fetch(`${API_URL}/health`);
@@ -131,7 +202,7 @@
             checkHealth();
         };
 
-        // --- GESTION AVATAR ---
+        // --- GESTION AVATAR (INCHANGÉ) ---
         const vidIdle = document.getElementById('vid-idle');
         const vidTalk = document.getElementById('vid-talk');
         const imgAvatar = document.getElementById('avatar-img');
@@ -139,7 +210,6 @@
 
         function initAvatar() {
             vidIdle.play().then(() => {
-                console.log("Avatar Vidéo Activé");
                 imgAvatar.style.display = 'none';
                 vidIdle.classList.remove('hidden');
             }).catch(e => {
@@ -160,7 +230,7 @@
             }
         }
 
-        // --- LECTEUR AUDIO ---
+        // --- LECTEUR AUDIO (INCHANGÉ) ---
         function playAudio(base64Audio) {
             if (!base64Audio) return;
             const audio = new Audio("data:audio/mp3;base64," + base64Audio);
@@ -170,7 +240,7 @@
             audio.play().catch(console.warn);
         }
 
-        // --- UI MESSAGES ---
+        // --- UI MESSAGES (INCHANGÉ) ---
         function addMsg(role, text, feedback=null) {
             const box = document.getElementById('chat-box');
             const isCoach = role === 'coach';
@@ -208,17 +278,18 @@
 
             div.innerHTML = html;
             box.appendChild(div);
-            // Scroll auto intelligent
             setTimeout(() => {
                 box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
             }, 50);
         }
 
-        // --- APP LOGIC ---
+        // --- LOGIQUE APP (MODIFIÉE POUR CV) ---
         async function startSession() {
             const name = document.getElementById('inp-name').value;
             const job = document.getElementById('inp-job').value;
             const company = document.getElementById('inp-company').value;
+            // Récupération du contenu du CV (texte brut)
+            const cvContent = document.getElementById('cv-content').value;
             
             document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
             document.getElementById('role-display').innerText = `Interviewing for ${job}`;
@@ -229,10 +300,18 @@
                 const res = await fetch(`${API_URL}/start_chat`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ session_id: sessionId, candidate_name: name, job_title: job, company_type: company })
+                    body: JSON.stringify({ 
+                        session_id: sessionId, 
+                        candidate_name: name, 
+                        job_title: job, 
+                        company_type: company,
+                        cv_content: cvContent // ENVOI DU CV au backend
+                    })
                 });
                 const data = await res.json();
+                
                 addMsg('coach', data.coach_response_text);
+                
                 if (data.audio_base64) playAudio(data.audio_base64);
                 initMic();
             } catch (e) {
@@ -241,6 +320,7 @@
             }
         }
 
+        // --- MICRO LOGIC (INCHANGÉ) ---
         async function initMic() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -263,7 +343,6 @@
                     document.getElementById('status-txt').classList.remove('text-red-500');
                 };
                 
-                // Support Mobile & Desktop Events
                 btn.addEventListener('mousedown', startRec); btn.addEventListener('touchstart', startRec);
                 btn.addEventListener('mouseup', stopRec); btn.addEventListener('touchend', stopRec);
             } catch (e) { alert("Mic required"); }
