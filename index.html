@@ -3,136 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bienvenue - Identification</title>
+    <title>Sarah - Job ITV Simulator</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
     <style>
-        /* --- RESET & BODY --- */
-        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        
+        /* --- RESET ET STYLE DE BASE --- */
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif; /* Utilise la police importée */
+        }
+
         body {
             margin: 0;
             padding: 0;
-            background-color: #f4f6f8;
-            height: 100vh; /* Prend toute la hauteur de l'écran */
+            background-color: #f8f9fd; /* Un fond très légèrement bleuté/gris */
+            min-height: 100vh;
             display: flex;
-            align-items: center; /* Centre verticalement */
             justify-content: center; /* Centre horizontalement */
-            
-            /* L'ASTUCE POUR REMONTER LE BLOC */
-            /* On ajoute du padding en bas, ce qui pousse le contenu vers le haut visuellement */
-            padding-bottom: 15vh; 
+            align-items: flex-start; /* Aligne en haut */
+            padding-top: 40px; /* Espace au-dessus */
+            padding-bottom: 40px;
         }
 
-        /* --- LA CARTE D'IDENTIFICATION --- */
-        .login-card {
+        /* --- LE CONTENEUR PRINCIPAL (C'est lui qu'on va contraindre) --- */
+        .main-container {
             background: white;
-            width: 90%; /* Mobile : 90% de l'écran */
-            max-width: 400px; /* PC : Jamais plus large que 400px */
-            padding: 30px;
+            width: 90%; /* MOBILE FIRST : Prend 90% de la largeur sur petit écran */
+            /* PAS DE MAX-WIDTH ICI PAR DÉFAUT */
+            
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08); /* Ombre douce */
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); /* Ombre très légère */
             text-align: center;
         }
 
-        .login-card h1 {
-            margin-top: 0;
-            color: #333;
-            font-size: 1.5rem;
-            margin-bottom: 25px;
+        /* --- HEADER (Photo, Titre) --- */
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 10px;
+            /* Remplace par la vraie URL de ton image si besoin */
+            background-image: url('https://i.pravatar.cc/150?img=1'); 
+            background-size: cover;
+            margin: 0 auto 15px auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
-        /* --- LES CHAMPS (INPUTS) --- */
-        .input-group {
-            margin-bottom: 15px;
-            text-align: left; /* Les labels restent à gauche */
+        h1 {
+            margin: 0;
+            color: #1a1a1a;
+            font-size: 1.8rem;
+            font-weight: 700;
         }
 
-        .input-group label {
-            display: block;
-            margin-bottom: 6px;
+        .subtitle {
+            color: #2563eb; /* Le bleu du screenshot */
             font-weight: 600;
             font-size: 0.9rem;
-            color: #555;
+            margin-top: 5px;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .input-group input {
+        /* --- FORMULAIRE --- */
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: #9ca3af; /* Gris clair pour les labels */
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .error-text {
+            color: #ef4444; /* Rouge */
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* Styles des inputs classiques */
+        .form-input {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            padding: 14px 16px;
+            border: 1px solid #e5e7eb; /* Bordure grise très claire */
+            border-radius: 8px;
             font-size: 1rem;
-            transition: border-color 0.3s;
+            color: #1f2937;
+            background-color: #f9fafb; /* Fond très légèrement gris */
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
-        .input-group input:focus {
-            border-color: #007bff;
+        .form-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .form-input:focus {
             outline: none;
+            border-color: #2563eb; /* Bleu au focus */
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
-        /* --- LE BOUTON --- */
-        .btn-start {
+        /* Style spécifique pour le faux input file */
+        .file-upload-fake {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background-color: #f3f4f6;
+            color: #4b5563;
+            cursor: pointer;
+        }
+
+        /* --- BOUTON --- */
+        .btn-primary {
             width: 100%;
-            padding: 14px;
-            background-color: #007bff;
+            padding: 16px;
+            background-color: #2563eb; /* Le bleu vif */
             color: white;
             border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: bold;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
             cursor: pointer;
+            transition: background-color 0.2s;
             margin-top: 10px;
-            transition: background 0.3s;
         }
 
-        .btn-start:hover {
-            background-color: #0056b3;
+        .btn-primary:hover {
+            background-color: #1d4ed8;
         }
 
+        /* ========================================= */
+        /* LA CORRECTION RESPONSIVE EST ICI :        */
+        /* ========================================= */
+        /* Cette règle ne s'applique QUE si l'écran est plus large que 768px (Tablettes et PC) */
+        @media (min-width: 768px) {
+            .main-container {
+                /* C'EST LA CLÉ : On bloque la largeur maximale */
+                max-width: 600px; 
+                
+                /* On augmente un peu le padding interne pour faire plus aéré sur PC */
+                padding: 40px; 
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="login-card">
-        <h1>Bienvenue</h1>
+    <div class="main-container">
+        <div class="avatar"></div>
+        <h1>Sarah</h1>
+        <div class="subtitle">Job ITV Simulator</div>
         
-        <form id="loginForm">
-            
-            <div class="input-group">
-                <label for="username">Votre Nom</label>
-                <input type="text" id="username" placeholder="Ex: Emmanuel Smadja" required>
+        <form>
+            <div class="form-group">
+                <div class="form-label-group">
+                    <label for="candidate-name">Candidate Name</label>
+                </div>
+                <input type="text" id="candidate-name" class="form-input" value="Alex">
             </div>
 
-            <div class="input-group">
-                <label for="role">Votre Poste</label>
-                <input type="text" id="role" placeholder="Ex: CEO" required>
+            <div class="form-group">
+                <div class="form-label-group">
+                    <label for="target-role">Target Role</label>
+                </div>
+                <input type="text" id="target-role" class="form-input" value="Product Manager">
             </div>
 
-            <div class="input-group">
-                <label for="company">Votre Entreprise</label>
-                <input type="text" id="company" placeholder="Ex: Light Bros" required>
+            <div class="form-group">
+                <div class="form-label-group">
+                    <label for="company-context">Company Context</label>
+                </div>
+                <input type="text" id="company-context" class="form-input" value="Tech Startup">
             </div>
 
-            <button type="submit" class="btn-start">Commencer</button>
-            
+            <div class="form-group">
+                <div class="form-label-group">
+                    <label>Upload CV (Optionnel)</label>
+                    <span class="error-text">Aucun fichier</span>
+                </div>
+                <div class="form-input file-upload-fake">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"> <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/> </svg>
+                    Choisir CV (.txt, .pdf, .doc, .docx)
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary">Start Interview ></button>
         </form>
     </div>
-
-    <script>
-        // SCRIPT MINIMAL POUR QUE LE BOUTON FASSE QUELQUE CHOSE
-        // (Tu pourras remplacer ça par ta vraie logique plus tard)
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault(); // Empêche la page de se recharger
-            
-            const nom = document.getElementById('username').value;
-            const poste = document.getElementById('role').value;
-            const boite = document.getElementById('company').value;
-
-            // Pour l'instant, ça affiche juste une alerte pour confirmer que ça marche
-            alert("Bienvenue " + nom + " ! \nPoste : " + poste + "\nBoîte : " + boite);
-            
-            // ICI : Tu mettras le code pour aller vers la page suivante
-            // Ex: window.location.href = 'page-suivante.html';
-        });
-    </script>
 
 </body>
 </html>
