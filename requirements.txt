@@ -7,3 +7,4 @@ gunicorn
 ffmpeg-python
 edge-tts
 psycopg2-binary
+requests

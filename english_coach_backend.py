@@ -1,4 +1,4 @@
-import os, sys, tempfile, json, datetime, time, shutil, base64, asyncio
+import os, sys, tempfile, json, datetime, time, shutil, base64
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -6,7 +6,8 @@ from pydub import AudioSegment
 import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import edge_tts
+import requests # <--- NOUVEL IMPORT OBLIGATOIRE
+from urllib.parse import quote # <--- NOUVEL IMPORT OBLIGATOIRE
 
 # --- CONFIGURATION ---
 load_dotenv(override=True)
@@ -79,35 +80,29 @@ def get_sess(sid):
         return row
     except: return None
 
-# --- AUDIO HAUTE QUALITÉ (EDGE TTS) ---
-async def _gen_audio_async(text, path):
-    # Voix : en-US-ChristopherNeural (Homme, Pro) ou en-US-EricNeural
-    communicate = edge_tts.Communicate(text, "en-US-ChristopherNeural")
-    await communicate.save(path)
-
+# --- AUDIO BASSE QUALITÉ (GOOGLE TRANSLATE TTS - ROBUSTE) ---
 def generate_ai_voice(text):
-    """Génère un audio HQ via Edge-TTS avec gestion robuste de la boucle."""
+    """Utilise l'API Google Translate TTS pour garantir l'audio."""
     try:
-        fd, out = tempfile.mkstemp(suffix=".mp3")
-        os.close(fd)
+        # Nettoyage et encodage du texte pour l'URL
+        clean_text = text.replace('\n', ' ').strip()
+        encoded_text = quote(clean_text)
         
-        # Création d'une nouvelle boucle pour éviter les conflits Gunicorn
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Endpoint public TTS (tl=en pour l'anglais)
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={encoded_text}"
         
-        try:
-            loop.run_until_complete(_gen_audio_async(text, out))
-        finally:
-            loop.close()
-
-        with open(out, "rb") as f: 
-            b64 = base64.b64encode(f.read()).decode('utf-8')
+        # Appel API simple (synchrone, pas de processus asynchrone qui plante)
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+        response.raise_for_status() # Lève une exception si le statut n'est pas 200
         
-        os.remove(out)
+        # Conversion en Base64
+        b64 = base64.b64encode(response.content).decode('utf-8')
         return b64
+        
     except Exception as e:
-        print(f"❌ Erreur Audio HQ: {e}")
-        return "" # Retourne vide si échec, le frontend ne plantera pas
+        print(f"❌ CRITIQUE: Échec Audio G-TTS: {e}")
+        # Laisse l'application répondre sans audio (Plan B si même G-TTS plante)
+        return ""
 
 # --- GEMINI ---
 def clean_json(text):
@@ -153,7 +148,7 @@ def start_chat():
     msg = f"Hi {d['candidate_name']}. I'm Mike. Let's start the interview for {d['job_title']}. Tell me about yourself."
     save_msg(sid, "model", msg)
     
-    # Génération audio HQ
+    # Génération audio (maintenant G-TTS)
     audio = generate_ai_voice(msg)
     
     return jsonify({"coach_response_text": msg, "audio_base64": audio, "transcription_user": "", "score_pronunciation": 10, "feedback_grammar": "", "better_response_example": "N/A"})
@@ -203,7 +198,7 @@ def analyze():
         save_msg(sid, "user", res.get("transcription_user", "..."))
         save_msg(sid, "model", res.get("coach_response_text", ""))
         
-        # Génération audio HQ pour la réponse
+        # Génération audio (maintenant G-TTS)
         res["audio_base64"] = generate_ai_voice(res.get("coach_response_text"))
         
         return jsonify(res)
