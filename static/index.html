@@ -34,36 +34,38 @@
     </div>
 
     <div id="setup-screen" class="fixed inset-0 bg-white z-50 flex flex-col transition-transform duration-500 ease-in-out" style="display:none;">
-        <div id="setup-screen-inner" class="flex-1 flex flex-col justify-center p-6 md:p-8 w-full max-w-md mx-auto md:max-w-2xl overflow-y-auto">
+        <div id="setup-screen-inner" class="flex-1 flex flex-col justify-center p-6 md:p-8 w-full max-w-md mx-auto md:max-w-3xl overflow-y-auto">
             
-            <div class="mb-6 md:mb-8 flex flex-col md:flex-row items-center justify-center md:gap-8 shrink-0">
+            <div class="mb-6 md:mb-10 flex flex-col md:flex-row items-center justify-center md:justify-start md:gap-8 shrink-0 md:px-10">
                 
                 <div class="w-28 h-28 md:w-32 md:h-32 rounded-full shadow-lg border-4 border-white overflow-hidden relative bg-slate-100 shrink-0">
                     <video src="idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
                 </div>
                 
                 <div class="text-center md:text-left mt-4 md:mt-0">
-                    <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-1">Sarah</h1>
+                    <h1 class="text-3xl md:text-5xl font-bold text-slate-900 tracking-tight mb-1">Sarah</h1>
                     <p class="text-blue-600 font-bold tracking-widest text-xs md:text-sm uppercase">Job ITV Simulator</p>
-                    <p class="hidden md:block text-slate-400 text-xs mt-2 max-w-xs">Le meilleur entraînement pour vos entretiens en anglais.</p>
+                    <p class="hidden md:block text-slate-400 text-sm mt-2 max-w-md">
+                        Le meilleur moyen de préparer votre prochain entretien. Configurez votre rôle, chargez votre CV et commencez la simulation.
+                    </p>
                 </div>
             </div>
             
-            <div class="space-y-3 md:space-y-3 shrink-0 md:px-10">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="space-y-3 md:space-y-4 shrink-0 md:px-10">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                     <div>
                         <label class="text-xs font-bold uppercase text-slate-400 tracking-wider ml-1">Candidate Name</label>
-                        <input id="inp-name" type="text" class="w-full p-3 md:p-2.5 bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Alex">
+                        <input id="inp-name" type="text" class="w-full p-3 md:p-3 bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Alex">
                     </div>
                     <div>
                         <label class="text-xs font-bold uppercase text-slate-400 tracking-wider ml-1">Target Role</label>
-                        <input id="inp-job" type="text" class="w-full p-3 md:p-2.5 bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Product Manager">
+                        <input id="inp-job" type="text" class="w-full p-3 md:p-3 bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Product Manager">
                     </div>
                 </div>
                 
                 <div>
                     <label class="text-xs font-bold uppercase text-slate-400 tracking-wider ml-1">Company Context</label>
-                    <input id="inp-company" type="text" class="w-full p-3 md:p-2.5 bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Tech Startup">
+                    <input id="inp-company" type="text" class="w-full p-3 md:p-3 bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Tech Startup">
                 </div>
 
                 <div>
@@ -72,339 +74,57 @@
                         <span id="cv-status" class="text-[10px] text-red-500">Aucun fichier</span>
                     </label>
                     <input id="inp-cv" type="file" accept=".txt,.pdf,.doc,.docx" class="hidden" onchange="readCVFile()">
-                    <button onclick="document.getElementById('inp-cv').click()" class="w-full p-3 md:p-2.5 bg-slate-100 rounded-xl font-medium text-sm text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all">
+                    <button onclick="document.getElementById('inp-cv').click()" class="w-full p-3 md:p-3 bg-slate-100 rounded-xl font-medium text-sm text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all">
                         <i class="fas fa-file-upload mr-2"></i> Choisir CV (.txt, .pdf, .doc, .docx)
                     </button>
                     <textarea id="cv-content" class="hidden"></textarea>
                 </div>
-            </div>
 
-            <div class="md:px-10 mt-6 md:mt-6">
-                <button onclick="event.preventDefault();startSession()" class="w-full bg-blue-600 text-white p-4 md:p-3 rounded-xl font-bold text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
-                    Start Interview <i class="fas fa-arrow-right"></i>
-                </button>
+                <div class="pt-4 md:pt-6">
+                    <button onclick="event.preventDefault();startSession()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
+                        Start Interview <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <header class="bg-white/90 backdrop-blur-md border-b p-3 flex flex-col items-center z-10 shadow-sm shrink-0">
-        <button onclick="returnToSetup()" class="absolute top-3 left-3 bg-slate-100 p-2 rounded-lg text-sm text-slate-600 hover:bg-slate-200 transition-colors">
-            <i class="fas fa-home"></i> Home
-        </button>
+    <header class="bg-white/90 backdrop-blur-md border-b p-3 z-10 shadow-sm shrink-0">
         
-        <div class="relative w-20 h-20 mb-1 group">
-            <div class="w-full h-full rounded-full overflow-hidden border-2 border-white shadow-md relative bg-slate-200">
-                <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
-                <video id="vid-talk" src="talk.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
-                <img id="avatar-img" src="coach_static.png" class="w-full h-full object-cover hidden" alt="Sarah">
-            </div>
+        <div class="flex flex-col md:flex-row items-center justify-center md:gap-6 relative">
             
-            <div id="audio-indicator" class="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center opacity-0 transition-opacity">
-                <i class="fas fa-volume-up text-white text-[9px]"></i>
+            <button onclick="returnToSetup()" class="absolute top-0 left-0 md:static md:mr-auto bg-slate-100 p-2 rounded-lg text-xs md:text-sm text-slate-600 hover:bg-slate-200 transition-colors">
+                <i class="fas fa-home"></i> <span class="hidden md:inline">Home</span>
+            </button>
+            
+            <div class="flex flex-col md:flex-row items-center gap-1 md:gap-4 mt-6 md:mt-0">
+                
+                <div class="relative w-20 h-20 md:w-16 md:h-16 group shrink-0">
+                    <div class="w-full h-full rounded-full overflow-hidden border-2 border-white shadow-md relative bg-slate-200">
+                        <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
+                        <video id="vid-talk" src="talk.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
+                        <img id="avatar-img" src="coach_static.png" class="w-full h-full object-cover hidden" alt="Sarah">
+                    </div>
+                    <div id="audio-indicator" class="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center opacity-0 transition-opacity">
+                        <i class="fas fa-volume-up text-white text-[9px]"></i>
+                    </div>
+                </div>
+                
+                <div class="text-center md:text-left">
+                    <h2 class="font-bold text-sm md:text-lg text-slate-800">Sarah</h2>
+                    <p id="role-display" class="text-[10px] md:text-xs uppercase font-bold text-blue-600 tracking-widest">JOB ITV SIMULATOR</p>
+                </div>
             </div>
-        </div>
-        
-        <div class="text-center">
-            <h2 class="font-bold text-sm text-slate-800">Sarah</h2>
-            <p id="role-display" class="text-[10px] uppercase font-bold text-blue-600 tracking-widest">JOB ITV SIMULATOR</p>
+
+            <div class="hidden md:block md:ml-auto w-[60px]"></div>
         </div>
     </header>
 
-    <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50 w-full max-w-2xl mx-auto scroll-smooth">
+    <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50 w-full max-w-3xl mx-auto scroll-smooth">
     </main>
 
-    <footer class="bg-white border-t p-4 pb-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 shrink-0 w-full max-w-2xl mx-auto">
+    <footer class="bg-white border-t p-4 pb-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 shrink-0 w-full max-w-3xl mx-auto">
         <div class="flex flex-col items-center">
             <p id="status-txt" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 h-3 transition-all">Tap mic to answer</p>
             
-            <button id="mic-btn" class="w-16 h-16 rounded-full bg-blue-600 text-white text-2xl shadow-blue-200 shadow-xl flex items-center justify-center transition-all active:scale-90 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale" disabled>
-                <div id="btn-icon"><i class="fas fa-microphone"></i></div>
-                <div id="btn-loader" class="hidden w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            </button>
-        </div>
-    </footer>
-
-    <script>
-        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? "http://127.0.0.1:5000" 
-            : "";
-
-        let sessionId = localStorage.getItem('coach_sess') || 'sess_' + Date.now();
-        localStorage.setItem('coach_sess', sessionId);
-        
-        let mediaRecorder;
-        let audioChunks = [];
-        const setupScreen = document.getElementById('setup-screen');
-        const chatBox = document.getElementById('chat-box');
-        const loaderScreen = document.getElementById('loader-screen');
-
-        // --- PARTIE 1: LOGIQUE CV ---
-        function readCVFile() {
-            const fileInput = document.getElementById('inp-cv');
-            const file = fileInput.files[0];
-            const status = document.getElementById('cv-status');
-            const cvContent = document.getElementById('cv-content');
-            
-            status.classList.remove('text-green-600', 'text-red-500');
-
-            if (!file) {
-                status.innerText = "Aucun fichier";
-                cvContent.value = "";
-                return;
-            }
-
-            if (file.size > 1024 * 1024 * 1) { // 1MB Max
-                status.innerText = "Fichier trop volumineux (Max 1MB)";
-                status.classList.add('text-red-500');
-                fileInput.value = "";
-                cvContent.value = "";
-                return;
-            }
-            
-            const fileName = file.name.toLowerCase();
-            const isDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
-            const isPdf = fileName.endsWith('.pdf');
-            
-            if (isDoc || isPdf) {
-                 status.innerText = "⚠️ Lecture fichier complexe. Précision faible.";
-                 status.classList.add('text-orange-500');
-            } else {
-                 status.innerText = `Lecture de ${file.name}...`;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                cvContent.value = e.target.result;
-                status.innerText = `Fichier chargé (${(file.size / 1024).toFixed(0)} KB)`;
-                status.classList.remove('text-red-500');
-                status.classList.add('text-green-600');
-            };
-            reader.onerror = function() {
-                status.innerText = "Erreur de lecture du fichier.";
-                status.classList.add('text-red-500');
-            };
-            reader.readAsText(file);
-        }
-        
-        // --- PARTIE 2: LOGIQUE APPLI ---
-        function returnToSetup() {
-            if (confirm("Êtes-vous sûr de vouloir mettre fin à cette session et revenir au formulaire ?")) {
-                document.getElementById('setup-screen').style.transform = 'translateY(0)';
-                document.getElementById('setup-screen').style.display = 'flex'; // Re-afficher
-                
-                sessionId = 'sess_' + Date.now();
-                localStorage.setItem('coach_sess', sessionId);
-                chatBox.innerHTML = '';
-            }
-        }
-
-        async function checkHealth() {
-            try {
-                const res = await fetch(`${API_URL}/health`);
-                if (res.ok) {
-                    loaderScreen.style.opacity = '0';
-                    setTimeout(() => { loaderScreen.style.display = 'none'; }, 500);
-                    setupScreen.style.display = 'flex';
-                } else {
-                    setTimeout(checkHealth, 3000); 
-                }
-            } catch (e) {
-                setTimeout(checkHealth, 3000); 
-            }
-        }
-
-        window.onload = function() {
-            checkHealth();
-        };
-
-        // --- GESTION AVATAR / LECTURE / MICRO ---
-        const vidIdle = document.getElementById('vid-idle');
-        const vidTalk = document.getElementById('vid-talk');
-        const imgAvatar = document.getElementById('avatar-img');
-        const audioIndicator = document.getElementById('audio-indicator');
-
-        function initAvatar() {
-            vidIdle.play().then(() => {
-                imgAvatar.style.display = 'none';
-                vidIdle.classList.remove('hidden');
-            }).catch(e => {
-                console.warn("Autoplay vidéo bloqué ou fichier manquant.", e);
-            });
-        }
-        
-        function setAvatarState(isTalking) {
-            audioIndicator.style.opacity = isTalking ? '1' : '0';
-            if (isTalking) {
-                vidIdle.classList.add('hidden');
-                vidTalk.classList.remove('hidden');
-                vidTalk.play();
-            } else {
-                vidTalk.classList.add('hidden');
-                vidIdle.classList.remove('hidden');
-                vidIdle.play();
-            }
-        }
-
-        function playAudio(base64Audio) {
-            if (!base64Audio) return;
-            const audio = new Audio("data:audio/mp3;base64," + base64Audio);
-            audio.onplay = () => setAvatarState(true);
-            audio.onended = () => setAvatarState(false);
-            audio.onerror = () => setAvatarState(false);
-            audio.play().catch(console.warn);
-        }
-
-        function addMsg(role, text, feedback=null) {
-            const box = document.getElementById('chat-box');
-            const isCoach = role === 'coach';
-            const div = document.createElement('div');
-            div.className = `bubble flex flex-col ${isCoach ? 'items-start' : 'items-end'} mb-4`;
-            
-            let html = `
-                <div class="px-5 py-3 rounded-2xl max-w-[90%] text-sm leading-relaxed shadow-sm 
-                            ${isCoach ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200' : 'bg-blue-600 text-white rounded-tr-none'}">
-                    ${text}
-                </div>`;
-
-            if (feedback) {
-                const scoreColor = feedback.score >= 8 ? 'bg-green-500' : (feedback.score >= 5 ? 'bg-orange-500' : 'bg-red-500');
-                html += `
-                <div class="mt-2 ml-1 w-[95%] bg-white p-4 rounded-xl border border-slate-200 shadow-md space-y-3 relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full ${scoreColor}"></div>
-                    <div class="flex justify-between items-end border-b border-slate-100 pb-2">
-                        <div>
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">Score</span>
-                            <span class="text-xl font-bold text-slate-800">${feedback.score}<span class="text-xs text-slate-400">/10</span></span>
-                        </div>
-                    </div>
-                    <div class="space-y-2 text-xs">
-                        ${feedback.grammar && feedback.grammar.length > 2 ? `<div class="text-slate-600"><strong class="text-red-500 block text-[9px] uppercase">Correction</strong>${feedback.grammar}</div>` : ''}
-                        <div><strong class="text-blue-500 block text-[9px] uppercase">Tip</strong>${feedback.tip}</div>
-                    </div>
-                    <div class="pt-2 mt-1 border-t border-slate-100">
-                        <div class="relative group cursor-pointer" onclick="this.querySelector('.blur-reveal').classList.add('revealed');">
-                            <div class="blur-reveal p-2 bg-slate-50 rounded text-slate-800 italic text-xs border border-slate-100">"${feedback.better}"</div>
-                        </div>
-                    </div>
-                </div>`;
-            }
-
-            div.innerHTML = html;
-            box.appendChild(div);
-            setTimeout(() => {
-                box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
-            }, 50);
-        }
-
-        async function startSession() {
-            const name = document.getElementById('inp-name').value;
-            const job = document.getElementById('inp-job').value;
-            const company = document.getElementById('inp-company').value;
-            const cvContent = document.getElementById('cv-content').value;
-            
-            // 1. Initialiser la transition
-            document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
-            document.getElementById('role-display').innerText = `Interviewing for ${job}`;
-            
-            initAvatar();
-
-            // 2. Cacher l'écran APRÈS la transition (FIX GHOST BUTTON)
-            setTimeout(() => {
-                 document.getElementById('setup-screen').style.display = 'none';
-            }, 500);
-
-            try {
-                const res = await fetch(`${API_URL}/start_chat`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        session_id: sessionId, 
-                        candidate_name: name, 
-                        job_title: job, 
-                        company_type: company,
-                        cv_content: cvContent 
-                    })
-                });
-                const data = await res.json();
-                
-                addMsg('coach', data.coach_response_text);
-                
-                if (data.audio_base64) playAudio(data.audio_base64);
-                initMic();
-            } catch (e) {
-                alert("Server Error: " + e);
-                // Si le serveur échoue, on remonte le setup
-                const setup = document.getElementById('setup-screen');
-                setup.style.display = 'flex';
-                // Petit délai pour permettre au display:flex d'être pris en compte avant l'anim
-                requestAnimationFrame(() => {
-                    setup.style.transform = 'translateY(0)';
-                });
-            }
-        }
-
-        async function initMic() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-                mediaRecorder.onstop = sendAudio;
-                
-                const btn = document.getElementById('mic-btn');
-                btn.disabled = false;
-                
-                const startRec = (e) => {
-                    e.preventDefault(); audioChunks = []; mediaRecorder.start();
-                    btn.classList.add('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.remove('bg-blue-600', 'text-2xl');
-                    document.getElementById('status-txt').innerText = "Listening...";
-                    document.getElementById('status-txt').classList.add('text-red-500');
-                };
-                const stopRec = (e) => {
-                    e.preventDefault(); if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-                    btn.classList.remove('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.add('bg-blue-600', 'text-2xl');
-                    document.getElementById('status-txt').classList.remove('text-red-500');
-                };
-                
-                btn.addEventListener('mousedown', startRec); btn.addEventListener('touchstart', startRec);
-                btn.addEventListener('mouseup', stopRec); btn.addEventListener('touchend', stopRec);
-            } catch (e) { alert("Mic required"); }
-        }
-
-        async function sendAudio() {
-            await new Promise(r => setTimeout(r, 200));
-            if (audioChunks.length === 0) return;
-
-            const btnIcon = document.getElementById('btn-icon');
-            const loader = document.getElementById('btn-loader');
-            const status = document.getElementById('status-txt');
-            
-            btnIcon.classList.add('hidden'); loader.classList.remove('hidden');
-            status.innerText = "Sarah is thinking...";
-
-            const blob = new Blob(audioChunks, { type: 'audio/webm' });
-            const fd = new FormData();
-            fd.append('audio', blob); fd.append('session_id', sessionId);
-
-            try {
-                const res = await fetch(`${API_URL}/analyze`, { method: 'POST', body: fd });
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-
-                addMsg('user', data.transcription_user);
-                setTimeout(() => {
-                    addMsg('coach', data.coach_response_text, {
-                        score: data.score_pronunciation, grammar: data.feedback_grammar,
-                        tip: data.next_step_advice, better: data.better_response_example
-                    });
-                    if (data.audio_base64) playAudio(data.audio_base64);
-                }, 600);
-            } catch (e) {
-                status.innerText = "Error"; addMsg('coach', `⚠️ Error: ${e.message}`);
-            } finally {
-                btnIcon.classList.remove('hidden'); loader.classList.add('hidden');
-                status.innerText = "Hold to Answer";
-            }
-        }
-    </script>
-</body>
-</html>
+            <button id="mic-btn" class="w-16 h-16 rounded-full bg-blue-600 text-white text-2xl shadow-blue-200 shadow-xl flex items-center justify
