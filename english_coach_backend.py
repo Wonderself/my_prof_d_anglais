@@ -20,7 +20,7 @@ if not DATABASE_URL: sys.exit("❌ DATABASE_URL MANQUANTE (Nécessaire pour Post
 
 try:
     genai.configure(api_key=API_KEY.strip())
-    MODEL_NAME = 'gemini-1.5-flash' # Ou 2.0 si dispo, 1.5 est très stable
+    MODEL_NAME = 'gemini-2.5-flash'
 except: sys.exit("❌ ERREUR CONFIG GEMINI")
 
 app = Flask(__name__, static_folder='.', static_url_path='')
