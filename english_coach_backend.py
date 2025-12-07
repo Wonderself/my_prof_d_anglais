@@ -7,15 +7,15 @@ import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import requests 
-from urllib.parse import quote
+from urllib.parse import quote 
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION INITIALE ---
 load_dotenv(override=True)
 
 API_KEY = os.getenv("GOOGLE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL") 
 MODEL_NAME = 'gemini-2.5-flash' 
-COACH_NAME = 'Sarah' # NOUVEAU NOM GLOBAL
+COACH_NAME = 'Sarah' 
 
 if not API_KEY: sys.exit("❌ CLÉ GEMINI MANQUANTE")
 if not DATABASE_URL: sys.exit("❌ DATABASE_URL MANQUANTE")
@@ -24,11 +24,13 @@ try:
     genai.configure(api_key=API_KEY.strip())
 except Exception as e: sys.exit(f"❌ ERREUR CONFIG GEMINI: {e}")
 
+# Initialisation de l'application Flask
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# --- DB ---
+# --- GESTION DE LA BASE DE DONNÉES (POSTGRES) ---
 def get_db_connection():
+    """Crée et retourne une connexion à PostgreSQL."""
     try:
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     except Exception as e:
@@ -36,8 +38,11 @@ def get_db_connection():
         return None
 
 def init_db():
+    """Initialise les tables si elles n'existent pas."""
     conn = get_db_connection()
-    if not conn: return
+    if not conn: 
+        print("❌ Impossible d'initialiser la DB, connexion échouée.")
+        return
     try:
         cur = conn.cursor()
         # SCHEMA MIS À JOUR : Ajout de cv_content
@@ -57,11 +62,13 @@ def init_db():
         print("✅ DB Initialisée (Schema V4.0)")
     except Exception as e: 
         print(f"❌ Erreur Init DB: {e}")
-        # Note: Si la colonne cv_content existe déjà, le CREATE IF NOT EXISTS est ignoré.
 
 init_db()
 
+# --- Fonctions de l'Historique ---
+
 def save_msg(sid, role, txt):
+    """Enregistre un message dans l'historique."""
     conn = get_db_connection()
     if not conn: return
     try:
@@ -69,9 +76,10 @@ def save_msg(sid, role, txt):
         cur.execute("INSERT INTO history (session_id, role, content, timestamp) VALUES (%s, %s, %s, NOW())", (sid, role, txt))
         conn.commit()
         conn.close()
-    except: pass
+    except Exception as e: print(f"Save Error: {e}")
 
 def get_hist(sid):
+    """Récupère l'historique pour Gemini (20 dernières entrées)."""
     conn = get_db_connection()
     if not conn: return []
     try:
@@ -83,6 +91,7 @@ def get_hist(sid):
     except: return []
 
 def get_sess(sid):
+    """Récupère les détails de la session."""
     conn = get_db_connection()
     if not conn: return None
     try:
@@ -95,20 +104,31 @@ def get_sess(sid):
 
 # --- AUDIO G-TTS (Robuste) ---
 def generate_ai_voice(text):
+    """Utilise l'API Google Translate TTS pour garantir l'audio."""
     try:
+        # Nettoyage et encodage du texte pour l'URL
         clean_text = text.replace('\n', ' ').strip()
         encoded_text = quote(clean_text)
+        
+        # Endpoint public TTS (tl=en pour l'anglais)
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={encoded_text}"
+        
+        # Appel API simple (synchrone, pas de processus asynchrone qui plante)
         response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response.raise_for_status()
+        response.raise_for_status() # Lève une exception si le statut n'est pas 200
+        
+        # Conversion en Base64
         b64 = base64.b64encode(response.content).decode('utf-8')
         return b64
+        
     except Exception as e:
         print(f"❌ CRITIQUE: Échec Audio G-TTS: {e}")
-        return ""
+        return "" 
 
 # --- LOGIQUE GEMINI (Masterclass) ---
+
 def clean_json(text):
+    """Nettoie le bloc de code Markdown autour du JSON de Gemini."""
     t = text.strip()
     if t.startswith("`" * 3):
         lines = t.split('\n')
@@ -116,10 +136,9 @@ def clean_json(text):
     return t
 
 def get_sys_prompt(name, job, company, cv_content=None):
-    # INJECTION CV DANS LE PROMPT
+    """Crée l'instruction système pour Gemini avec injection du CV."""
     cv_injection = ""
     if cv_content and cv_content.strip():
-        # L'instruction est claire: analyser pour améliorer les réponses
         cv_injection = (
             f"CONTEXTE CLÉ: Le CV/Résumé de {name} est fourni ci-dessous. "
             f"Utilisez les expériences, compétences et réalisations listées dans ce CV pour améliorer la qualité et la pertinence de tous les exemples de 'better_response_example' que vous fournirez. "
@@ -159,13 +178,15 @@ def start_chat():
     d = request.json
     sid = d.get('session_id')
     
-    # Récupération du CV (peut être None)
     cv_content = d.get('cv_content', None) 
+    
+    # FIX CRITIQUE: Retire les caractères NUL (0x00) pour éviter les erreurs PostgreSQL
+    if cv_content:
+        cv_content = cv_content.replace('\x00', '') 
     
     conn = get_db_connection()
     if conn:
         cur = conn.cursor()
-        # Mise à jour avec le champ cv_content
         cur.execute("""
             INSERT INTO sessions (session_id, candidate_name, job_title, company_type, cv_content, created_at)
             VALUES (%s, %s, %s, %s, %s, NOW())
@@ -178,7 +199,6 @@ def start_chat():
         conn.commit()
         conn.close()
 
-    # CORRECTION NOM: Message de Sarah
     msg = f"Hi {d['candidate_name']}. I'm {COACH_NAME}. Let's start the interview for {d['job_title']}. Tell me about yourself."
     save_msg(sid, "model", msg)
     
@@ -230,6 +250,8 @@ def analyze():
             u_file = genai.get_file(u_file.name)
             retry += 1
             
+        if u_file.state.name != "ACTIVE": raise Exception("Gemini File Upload Failed")
+        
         resp = chat.send_message([u_file, "Analyze."], generation_config=genai.GenerationConfig(response_mime_type="application/json", response_schema=SCHEMA))
         
         try:
