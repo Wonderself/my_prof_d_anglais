@@ -171,7 +171,7 @@ def analyze():
         data['audio_base64'] = generate_tts(data.get('coach_response_text'))
         return jsonify(data)
 
-    except Exception as e:
+    except Exception as e: 
         print(f"ERROR: {e}")
         return jsonify({"error": str(e)}), 500
     finally:

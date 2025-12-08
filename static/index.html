@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sarah | English Coach</title>
+    <title>JOB ITV SIMULATOR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#007AFF">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
 
     <script src="https://www.paypal.com/sdk/js?client-id=EG1d9FiIIdSGrTaUQYWCc5MujxfoioRG8qpEB8QaiykiOKNfRyuYxfa8uf4czFpYaEbVUGg86ka0bmSa&currency=EUR"></script>
 
@@ -36,11 +36,12 @@
     </div>
 
     <div id="login-screen" class="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center p-6 hidden">
-        <div class="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-100 mb-6 shadow-xl">
-             <img src="coach_static.png" class="w-full h-full object-cover">
+        <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-100 mb-6 shadow-xl bg-slate-200 relative">
+             <video src="idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
         </div>
-        <h1 class="text-3xl font-bold mb-2">Sarah Coach</h1>
-        <p class="text-slate-500 mb-8 text-center max-w-xs">Master your English interviews with AI.</p>
+        
+        <h1 class="text-2xl font-bold mb-2 tracking-tight text-center">JOB ITV SIMULATOR</h1>
+        <p class="text-slate-500 mb-8 text-center max-w-xs text-sm">Master your English interviews with AI.</p>
         
         <a href="/login/google" class="flex items-center gap-3 bg-white border border-slate-300 text-slate-700 px-6 py-4 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all w-full max-w-xs justify-center group">
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-6 h-6 group-hover:scale-110 transition-transform">
@@ -121,11 +122,9 @@
 
     <header id="chat-header" class="hidden bg-white/90 backdrop-blur-md border-b p-2 md:p-3 z-10 shadow-sm shrink-0 relative">
         <div class="flex flex-col md:flex-row items-center justify-center md:gap-4 relative max-w-4xl mx-auto w-full">
-            
             <button onclick="returnToSetup()" class="absolute right-3 top-4 text-slate-300 hover:text-slate-500 md:static md:mr-auto md:bg-slate-100 md:p-2 md:rounded-lg md:text-slate-600 md:hover:bg-slate-200 transition-colors">
                 <i class="fas fa-home"></i> <span class="hidden md:inline ml-1">Home</span>
             </button>
-            
             <div class="flex flex-col md:flex-row items-center gap-1 md:gap-3 mt-4 md:mt-0">
                 <div class="relative w-16 h-16 md:w-14 md:h-14 group shrink-0">
                     <div class="w-full h-full rounded-full overflow-hidden border-2 border-white shadow-md relative bg-slate-200">
@@ -171,12 +170,8 @@
         async function checkUser() {
             const loader = document.getElementById('loader-screen');
             try {
-                // On tente de contacter le serveur
                 const res = await fetch('/api/me');
-                
-                // Si le serveur répond 404 ou 500, on force l'erreur pour aller au catch
                 if (!res.ok) throw new Error("Server Error or Not Logged In");
-
                 const data = await res.json();
                 
                 if (!data.logged_in) {
@@ -186,7 +181,6 @@
                     initPayPal();
                 } else {
                     document.getElementById('setup-screen').classList.remove('hidden');
-                    
                     if (data.name) document.getElementById('inp-name').value = data.name;
                     if (data.saved_cv) {
                         userCV = data.saved_cv;
@@ -197,11 +191,9 @@
                     }
                 }
             } catch (e) { 
-                console.warn("Auth Check Failed (Normal if first time):", e);
-                // EN CAS D'ERREUR, ON MONTRE L'ÉCRAN DE LOGIN PAR DÉFAUT
+                console.warn("Auth Check Failed:", e);
                 document.getElementById('login-screen').classList.remove('hidden');
             } finally {
-                // QUOI QU'IL ARRIVE, ON VIRE LE LOADER
                 loader.classList.add('opacity-0');
                 setTimeout(() => loader.style.display = 'none', 500);
             }
@@ -214,13 +206,10 @@
             if (!window.paypal) return;
             paypal.Buttons({
                 createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{ amount: { value: '9.99' } }]
-                    });
+                    return actions.order.create({ purchase_units: [{ amount: { value: '9.99' } }] });
                 },
                 onApprove: function(data, actions) {
                     return actions.order.capture().then(function(details) {
-                        // Paiement réussi, on prévient le serveur
                         document.getElementById('payment-screen').innerHTML = '<div class="text-center"><h2 class="text-2xl font-bold text-green-600">Payment Success!</h2><p>Redirecting...</p></div>';
                         fetch('/api/payment_success', { method: 'POST' }).then(() => location.reload());
                     });
@@ -234,13 +223,10 @@
             const file = fileInput.files[0];
             const status = document.getElementById('cv-status');
             const cvContent = document.getElementById('cv-content');
-            
             if (!file) return;
-
             if (file.size > 1024 * 1024 * 1) { 
                 status.innerText = "Max 1MB"; status.classList.add('text-red-500'); return;
             }
-            
             status.innerText = `Reading...`;
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -259,9 +245,8 @@
         const audioIndicator = document.getElementById('audio-indicator');
 
         function initAvatar() {
-            vidIdle.play().then(() => {
-                imgAvatar.style.display = 'none'; vidIdle.classList.remove('hidden');
-            }).catch(e => console.warn("Autoplay blocked", e));
+            vidIdle.play().then(() => { imgAvatar.style.display = 'none'; vidIdle.classList.remove('hidden'); })
+                   .catch(e => console.warn("Autoplay blocked", e));
         }
         
         function setAvatarState(isTalking) {
@@ -274,9 +259,7 @@
         }
 
         function returnToSetup() {
-            if (confirm("Stop interview?")) {
-                location.reload(); 
-            }
+            if (confirm("Stop interview?")) { location.reload(); }
         }
 
         // --- 5. CHAT CORE ---
@@ -323,7 +306,6 @@
                     </div>
                 </div>`;
             }
-
             div.innerHTML = html;
             box.appendChild(div);
             setTimeout(() => { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); }, 50);
@@ -335,7 +317,6 @@
             const company = document.getElementById('inp-company').value;
             const cvContent = document.getElementById('cv-content').value;
 
-            // Transition UI
             document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
             setTimeout(() => {
                  document.getElementById('setup-screen').classList.add('hidden');
@@ -350,25 +331,16 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ 
-                        session_id: sessionId, 
-                        candidate_name: name, 
-                        job_title: job, 
-                        company_type: company, 
-                        cv_content: cvContent 
+                        session_id: sessionId, candidate_name: name, job_title: job, 
+                        company_type: company, cv_content: cvContent 
                     })
                 });
                 const data = await res.json();
-                
-                if(data.error) {
-                    alert(data.error); location.reload(); return;
-                }
-
+                if(data.error) { alert(data.error); location.reload(); return; }
                 addMsg('coach', data.coach_response_text);
                 if (data.audio_base64) playAudio(data.audio_base64);
                 initMic();
-            } catch (e) {
-                alert("Server Error"); location.reload();
-            }
+            } catch (e) { alert("Server Error"); location.reload(); }
         }
 
         async function initMic() {
@@ -400,7 +372,6 @@
         async function sendAudio() {
             await new Promise(r => setTimeout(r, 200));
             if (audioChunks.length === 0) return;
-
             const btnIcon = document.getElementById('btn-icon');
             const loader = document.getElementById('btn-loader');
             const status = document.getElementById('status-txt');
@@ -415,7 +386,6 @@
                 const res = await fetch(`${API_URL}/analyze`, { method: 'POST', body: fd });
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
-
                 addMsg('user', data.transcription_user);
                 setTimeout(() => {
                     addMsg('coach', data.coach_response_text, {
@@ -431,7 +401,6 @@
             }
         }
         
-        // PWA Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
         }
