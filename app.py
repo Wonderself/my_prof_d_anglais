@@ -1,37 +1,54 @@
-import os, sys, tempfile, json, time, shutil, base64
-from flask import Flask, request, jsonify
+import os, sys, tempfile, json, time, base64, datetime
+from flask import Flask, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from authlib.integrations.flask_client import OAuth
 from pydub import AudioSegment
 import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import requests 
-from urllib.parse import quote 
+import requests
+from urllib.parse import quote
 
-# --- CONFIG (CLOUD) ---
+# --- CONFIG ---
 API_KEY = os.getenv("GOOGLE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
-MODEL_NAME = 'gemini-1.5-flash' 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+# Clé secrète indispensable pour les sessions Flask
+SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_key_change_me_in_prod") 
+
+MODEL_NAME = 'gemini-1.5-flash'
 COACH_NAME = 'Sarah'
 
-if not API_KEY or not DATABASE_URL:
-    print("⚠️ WARNING: Keys missing. Ensure they are set in Render Dashboard.")
-
-try:
-    if API_KEY: genai.configure(api_key=API_KEY)
-except Exception as e:
-    print(f"⚠️ GEMINI CONFIG ERROR: {e}")
-
 app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = SECRET_KEY
 CORS(app)
 
-# --- OPTIMISATION CACHE (PWA & VITESSE) ---
-# C'est ici qu'on dit au navigateur : "Garde les vidéos en mémoire 1 an !"
+# --- INIT AUTH & LOGIN ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+oauth = OAuth(app)
+
+google = oauth.register(
+    name='google',
+    client_id=GOOGLE_CLIENT_ID,
+    client_secret=GOOGLE_CLIENT_SECRET,
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    access_token_params=None,
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    authorize_params=None,
+    api_base_url='https://www.googleapis.com/oauth2/v1/',
+    client_kwargs={'scope': 'openid email profile'},
+)
+
+if API_KEY: genai.configure(api_key=API_KEY)
+
+# --- CACHE OPTIMIZATION (PWA) ---
 @app.after_request
 def add_header(response):
-    # Si le fichier demandé est une vidéo ou une image
-    if request.path.startswith('/') and (request.path.endswith('.mp4') or request.path.endswith('.png') or request.path.endswith('.jpg')):
-        response.cache_control.max_age = 31536000 # 31536000 secondes = 1 an
+    if request.path.startswith('/') and (request.path.endswith('.mp4') or request.path.endswith('.png')):
+        response.cache_control.max_age = 31536000
         response.cache_control.public = True
     return response
 
@@ -48,7 +65,20 @@ def init_db():
     if not conn: return
     try:
         cur = conn.cursor()
-        cur.execute('''CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, candidate_name TEXT, job_title TEXT, company_type TEXT, cv_content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
+        # Table USERS pour le SaaS
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                google_id TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                name TEXT,
+                cv_content TEXT,
+                sub_expires TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ''')
+        # Table SESSIONS pour l'historique
+        cur.execute('''CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, user_id INTEGER, candidate_name TEXT, job_title TEXT, company_type TEXT, cv_content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         cur.execute('''CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         conn.commit()
         conn.close()
@@ -56,10 +86,104 @@ def init_db():
 
 init_db()
 
-# --- AUDIO & AI ---
+# --- USER CLASS (Flask-Login) ---
+class User(UserMixin):
+    def __init__(self, id, email, name, cv_content, sub_expires):
+        self.id = id
+        self.email = email
+        self.name = name
+        self.cv_content = cv_content
+        self.sub_expires = sub_expires
+
+    @property
+    def is_paid(self):
+        if not self.sub_expires: return False
+        return self.sub_expires > datetime.datetime.now()
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db_connection()
+    if not conn: return None
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+    u = cur.fetchone()
+    conn.close()
+    if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
+    return None
+
+# --- AUTH ROUTES ---
+@app.route('/login/google')
+def login_google():
+    redirect_uri = url_for('authorize', _external=True)
+    # Fix Render HTTPS issue
+    if redirect_uri.startswith('http://') and 'onrender' in redirect_uri:
+        redirect_uri = redirect_uri.replace('http://', 'https://')
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/auth/callback')
+def authorize():
+    try:
+        token = google.authorize_access_token()
+        resp = google.get('userinfo')
+        user_info = resp.json()
+        
+        google_id = user_info['id']
+        email = user_info['email']
+        name = user_info['name']
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Upsert User (Créer ou Mettre à jour)
+        cur.execute("""
+            INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s)
+            ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name
+            RETURNING *;
+        """, (google_id, email, name))
+        u = cur.fetchone()
+        conn.commit()
+        conn.close()
+
+        user_obj = User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
+        login_user(user_obj)
+        return redirect('/')
+    except Exception as e:
+        return f"Auth Error: {e}"
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect('/')
+
+# --- PAYMENT ROUTE ---
+@app.route('/api/payment_success', methods=['POST'])
+@login_required
+def payment_success():
+    days = 90 # 3 mois d'accès
+    new_expiry = datetime.datetime.now() + datetime.timedelta(days=days)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (new_expiry, current_user.id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "new_expiry": new_expiry.isoformat()})
+
+# --- API INFO USER ---
+@app.route('/api/me')
+def get_me():
+    if not current_user.is_authenticated:
+        return jsonify({"logged_in": False})
+    return jsonify({
+        "logged_in": True,
+        "name": current_user.name,
+        "is_paid": current_user.is_paid,
+        "saved_cv": current_user.cv_content
+    })
+
+# --- LOGIQUE CORE AI ---
 def generate_tts(text):
     try:
-        # TTS Google rapide et gratuit (Fallback robuste)
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:500])}"
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
         if r.status_code == 200: return base64.b64encode(r.content).decode('utf-8')
@@ -67,17 +191,12 @@ def generate_tts(text):
     return None
 
 def get_prompt(name, job, company, cv, history_len):
-    """
-    Prompt Engineering Avancé pour structurer l'entretien et forcer l'usage du CV.
-    """
-    # Détection approximative de l'étape de l'entretien
     stage = "INTRODUCTION"
-    if history_len > 2: stage = "DEEP DIVE EXPERIENCE (Challenge the CV)"
-    if history_len > 6: stage = "HARD SKILLS & TECHNICAL"
-    if history_len > 10: stage = "SOFT SKILLS & BEHAVIORAL"
+    if history_len > 2: stage = "DEEP DIVE EXPERIENCE"
+    if history_len > 6: stage = "HARD SKILLS"
+    if history_len > 10: stage = "SOFT SKILLS"
     if history_len > 14: stage = "CLOSING"
-
-    cv_context = f"\n=== CANDIDATE CV (CRITICAL SOURCE) ===\n{cv[:5000]}\n=== END CV ===\n" if cv else ""
+    cv_context = f"\n=== CANDIDATE CV ===\n{cv[:5000]}\n=== END CV ===\n" if cv else ""
     
     return (
         f"ROLE: You are {COACH_NAME}, an expert recruiter at {company}. Interviewing {name} for {job}.\n"
@@ -96,7 +215,6 @@ def get_prompt(name, job, company, cv, history_len):
         f"'next_step_advice': 'Short tip'}}"
     )
 
-# --- ROUTES ---
 @app.route('/')
 def index(): return app.send_static_file('index.html')
 
@@ -104,22 +222,38 @@ def index(): return app.send_static_file('index.html')
 def health(): return jsonify({"status": "alive"})
 
 @app.route('/start_chat', methods=['POST'])
+@login_required
 def start_chat():
+    # Protection Paiement
+    if not current_user.is_paid: return jsonify({"error": "Payment required"}), 403
+    
     d = request.json
     sid = d.get('session_id')
+    cv_content = d.get('cv_content')
+
     conn = get_db_connection()
-    if conn:
-        cur = conn.cursor()
-        cur.execute("INSERT INTO sessions (session_id, candidate_name, job_title, company_type, cv_content) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (session_id) DO NOTHING", 
-                   (sid, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), d.get('cv_content','')))
-        conn.commit()
-        conn.close()
+    cur = conn.cursor()
     
-    msg = f"Hello {d.get('candidate_name')}. I'm {COACH_NAME}. I've reviewed your CV. Let's start. Briefly introduce yourself."
+    # 1. Sauvegarde du CV dans le profil User si nouveau
+    if cv_content:
+        cur.execute("UPDATE users SET cv_content = %s WHERE id = %s", (cv_content, current_user.id))
+    else:
+        cv_content = current_user.cv_content
+
+    # 2. Création session
+    cur.execute("INSERT INTO sessions (session_id, user_id, candidate_name, job_title, company_type, cv_content) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (session_id) DO NOTHING", 
+               (sid, current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), cv_content))
+    conn.commit()
+    conn.close()
+    
+    msg = f"Hello {d.get('candidate_name')}. I'm {COACH_NAME}. Let's start. Briefly introduce yourself."
     return jsonify({"coach_response_text": msg, "audio_base64": generate_tts(msg), "transcription_user": ""})
 
 @app.route('/analyze', methods=['POST'])
+@login_required
 def analyze():
+    if not current_user.is_paid: return jsonify({"error": "Payment required"}), 403
+    
     sid = request.form.get('session_id')
     f = request.files.get('audio')
     if not f or not sid: return jsonify({"error": "No audio"}), 400
@@ -127,12 +261,10 @@ def analyze():
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         f.save(tmp.name)
         webm_path = tmp.name
-    
     mp3_path = webm_path + ".mp3"
     
     try:
         AudioSegment.from_file(webm_path).export(mp3_path, format="mp3")
-        
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
@@ -141,11 +273,8 @@ def analyze():
         hist_rows = cur.fetchall()
         conn.close()
 
-        # On garde les 10 derniers échanges pour le contexte
         hist = [{"role": r['role'], "parts": [r['content']]} for r in hist_rows[-10:]]
-        history_len = len(hist_rows)
-        
-        sys_prompt = get_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], history_len)
+        sys_prompt = get_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(hist_rows))
         
         model = genai.GenerativeModel(MODEL_NAME, system_instruction=sys_prompt)
         chat = model.start_chat(history=hist)
@@ -153,13 +282,10 @@ def analyze():
         uf = genai.upload_file(mp3_path, mime_type="audio/mp3")
         while uf.state.name == "PROCESSING": time.sleep(0.5); uf = genai.get_file(uf.name)
         
-        resp = chat.send_message([uf, "Analyze this response."], generation_config={"response_mime_type": "application/json"})
+        resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
         
-        try:
-            data = json.loads(resp.text)
-        except:
-            clean = resp.text.replace('```json', '').replace('```', '').strip()
-            data = json.loads(clean)
+        try: data = json.loads(resp.text)
+        except: data = json.loads(resp.text.replace('```json', '').replace('```', '').strip())
         
         conn = get_db_connection()
         cur = conn.cursor()
@@ -170,10 +296,7 @@ def analyze():
         
         data['audio_base64'] = generate_tts(data.get('coach_response_text'))
         return jsonify(data)
-
-    except Exception as e: 
-        print(f"ERROR: {e}")
-        return jsonify({"error": str(e)}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(webm_path): os.remove(webm_path)
         if os.path.exists(mp3_path): os.remove(mp3_path)
