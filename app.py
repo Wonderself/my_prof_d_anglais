@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, redirect, url_for, session, send_from
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
-from werkzeug.middleware.proxy_fix import ProxyMiddleware  # CORRECTION : Import de ProxyMiddleware au lieu de ProxyFix
+from werkzeug.middleware.proxy_fix import ProxyFix  # CORRECTION FINALE : Retour à ProxyFix avec syntaxe 3.x (x_for au lieu de x_forwarded_for)
 from pydub import AudioSegment
 import google.generativeai as genai
 import psycopg2
@@ -33,16 +33,16 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = SECRET_KEY
 CORS(app)
 
-# CORRECTION : Remplacement de ProxyFix par ProxyMiddleware pour Werkzeug 3.x
-# Trusted_proxies='0.0.0.0/0' pour dev/Render (restreignez en prod à des IPs spécifiques)
-app.wsgi_app = ProxyMiddleware(
+# CORRECTION FINALE : Syntaxe ProxyFix pour Werkzeug 3.x
+# Premier arg : l'app ; puis x_for=1 (équiv. x_forwarded_for), x_proto=1, etc.
+# Pas de trusted_proxies ici – c'est implicite avec les x_ params
+app.wsgi_app = ProxyFix(
     app.wsgi_app,
-    trusted_proxies=('0.0.0.0/0',),
-    x_for=1,    # Équivalent à x_forwarded_for=1
-    x_proto=1,  # Équivalent à x_proto=1
-    x_host=1,   # Équivalent à x_host=1
-    x_port=1,   # Équivalent à x_port=1
-    x_prefix=0  # Pas de prefix needed
+    x_for=1,    # Trust X-Forwarded-For
+    x_proto=1,  # Trust X-Forwarded-Proto (pour HTTPS sur Render)
+    x_host=1,   # Trust X-Forwarded-Host
+    x_port=1,   # Trust X-Forwarded-Port
+    x_prefix=0  # Pas de prefix
 )
 
 # FIX CSP: Headers Robustes pour PayPal/Tailwind (Autorise unsafe-inline/eval sans risque excessif)
