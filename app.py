@@ -31,7 +31,8 @@ app.config['PREFERRED_URL_SCHEME'] = 'https'
 CORS(app)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# --- CSP HEADERS (CORRIGÉS: AJOUT DE SANDBOX PAYPAL) ---
+# --- CSP HEADERS (CORRIGÉS POUR PAYPAL LIVE ET SANDBOX) ---
+# On autorise tout pour être sûr que ça ne bloque pas l'argent
 @app.after_request
 def add_security_headers(response):
     csp = (
@@ -150,10 +151,10 @@ def authorize():
         
         conn = get_db_connection()
         if not conn:
-            # DEBUG: Affiche si la DB ne répond pas
             return "<h1>ERREUR CRITIQUE DB</h1><p>Impossible de se connecter à la base Neon. Vérifiez DATABASE_URL dans Render (pas de guillemets, bon mot de passe).</p>"
 
         cur = conn.cursor()
+        # C'EST ICI QUE CA PLANTE SOUVENT
         cur.execute("INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s) ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name RETURNING *;", 
                    (user_info['id'], user_info['email'], user_info['name']))
         u = cur.fetchone()
@@ -163,8 +164,14 @@ def authorize():
         return redirect('/')
     except Exception as e: 
         logger.error(f"AUTH FAIL: {e}")
-        # DEBUG: Affiche l'erreur exacte à l'écran
-        return f"<h1>LOGIN ERROR</h1><p style='color:red; font-weight:bold;'>{str(e)}</p><p>Copie ce message pour l'envoyer à l'expert.</p>"
+        # ON AFFICHE L'ERREUR POUR QUE TU PUISSES ME LA COPIER
+        return f"""
+        <div style='font-family:sans-serif; padding:50px; text-align:center;'>
+            <h1 style='color:red;'>ERREUR DE CONNEXION</h1>
+            <p style='background:#eee; padding:20px; border-radius:10px; font-family:monospace;'>{str(e)}</p>
+            <p>Copie le texte ci-dessus et envoie-le à l'expert.</p>
+        </div>
+        """
 
 @app.route('/logout')
 @login_required
