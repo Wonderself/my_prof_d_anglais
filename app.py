@@ -38,8 +38,10 @@ google = oauth.register(
     name='google',
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
-    # FIX CRITIQUE : Utilisation de l'URL de découverte standard OpenID
+    # FIX CRITIQUE 1: Utilisation de l'URL de découverte standard (pour jwks_uri)
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    # FIX CRITIQUE 2: On force l'URL de base pour que 'userinfo' fonctionne
+    api_base_url='https://www.googleapis.com/oauth2/v1/', 
     client_kwargs={'scope': 'openid email profile'},
 )
 
@@ -122,7 +124,8 @@ def login_google():
 def authorize():
     try:
         token = google.authorize_access_token()
-        resp = google.get('userinfo')
+        # CETTE LIGNE NE PLANTERA PLUS !
+        resp = google.get('userinfo') 
         user_info = resp.json()
         
         google_id = user_info['id']
