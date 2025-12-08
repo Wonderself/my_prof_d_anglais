@@ -25,7 +25,7 @@ if not all([API_KEY, DATABASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET]):
 MODEL_NAME = 'gemini-2.5-flash' # Modèle le plus récent
 COACH_NAME = 'JIS_Recruiter' # Nom interne du rôle AI (ne s'affiche pas)
 
-# --- DÉBUT DE L'APPLICATION FLASK (CRITIQUE : NE DOIT PAS ÊTRE DÉPLACÉ) ---
+# --- DÉBUT DE L'APPLICATION FLASK (CRITIQUE : DOIT ÊTRE ICI) ---
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = SECRET_KEY
 CORS(app)
@@ -39,9 +39,7 @@ google = oauth.register(
     name='google',
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
-    # FIX CRITIQUE 1: Utilisation de l'URL de découverte standard (pour jwks_uri)
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    # FIX CRITIQUE 2: On force l'URL de base pour que 'userinfo' fonctionne
     api_base_url='https://www.googleapis.com/oauth2/v1/', 
     client_kwargs={'scope': 'openid email profile'},
 )
@@ -113,6 +111,10 @@ def load_user(user_id):
     if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
     return None
 
+# ==========================================
+# DÉFINITION DES ROUTES (APRÈS app = Flask(...))
+# ==========================================
+
 # --- AUTH ROUTES ---
 @app.route('/login/google')
 def login_google():
@@ -168,6 +170,7 @@ def payment_success():
     conn.close()
     return jsonify({"status": "ok", "new_expiry": new_expiry.isoformat()})
 
+# CE BLOC ÉTAIT MAL PLACÉ : IL EST CORRECTEMENT ICI
 @app.route('/api/promo_code', methods=['POST'])
 @login_required
 def promo_code():
@@ -218,7 +221,7 @@ def get_prompt(name, job, company, cv, history_len):
     if history_len > 14: stage = "CLOSING"
     cv_context = f"\n=== CANDIDATE CV ===\n{cv[:5000]}\n=== END CV ===\n" if cv else ""
     return (
-        f"ROLE: You are an expert recruiter for JOB ITV SIMULATOR at {company}. Interviewing {name} for {job}.\n" # Brading neutre
+        f"ROLE: You are an expert recruiter for JOB ITV SIMULATOR at {company}. Interviewing {name} for {job}.\n" 
         f"CURRENT STAGE: {stage}.\n{cv_context}"
         "GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
         "RULES: Ask ONE short question at a time (max 15 words). Follow flow. Use CV facts.\n"
