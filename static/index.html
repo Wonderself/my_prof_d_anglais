@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>JOB ITV SIMULATOR</title>
+    <link rel="icon" href="fav.png" type="image/png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#007AFF">
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
+    
     <script src="https://www.paypal.com/sdk/js?client-id=AVaXhjiQjRN4YKxQnkh1jBWfgWDNjA23YLd3SAUGPBDlDyjOeswmF1D0n0LnyniKbLa_HkZGB9vXAHuv&currency=EUR"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         :root { --primary: #007AFF; --bg: #F2F2F7; }
@@ -54,10 +58,10 @@
                 <p class="font-semibold text-slate-800 mb-4">Why choose JOB ITV SIMULATOR?</p>
                 <ul class="space-y-3 text-sm text-slate-600">
                     <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **Personalized Masterclass:** Our V6 model analyzes your CV.
+                        **Personalized Masterclass:** Our V6 model analyzes your uploaded CV.
                     </li>
                     <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **Real-Time Language Correction:** Instant grammar feedback.
+                        **Real-Time Language Correction:** Instant feedback.
                     </li>
                 </ul>
             </div>
@@ -91,7 +95,6 @@
                     <p class="hidden md:block text-slate-400 text-xs mt-1 max-w-sm leading-tight">Configure your role, upload your CV and start the simulation.</p>
                 </div>
             </div>
-            
             <div class="space-y-3 md:space-y-3 shrink-0 md:px-12">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <div>
@@ -103,12 +106,10 @@
                         <input id="inp-job" type="text" class="w-full p-3 md:p-2.5 text-sm bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Product Manager">
                     </div>
                 </div>
-                
                 <div>
                     <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1">COMPANY CONTEXT</label>
                     <input id="inp-company" type="text" class="w-full p-3 md:p-2.5 text-sm bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Tech Startup">
                 </div>
-
                 <div>
                     <label for="inp-cv" class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1 flex items-center justify-between">
                         MY RESUME (PDF/DOCX/TXT)
@@ -120,7 +121,6 @@
                     </button>
                     <textarea id="cv-content" class="hidden"></textarea>
                 </div>
-
                 <div class="pt-3 md:pt-4">
                     <button onclick="event.preventDefault();startSession()" class="w-full bg-blue-600 text-white p-4 md:p-3 rounded-xl font-bold text-base md:text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
                         START INTERVIEW <i class="fas fa-arrow-right"></i>
@@ -331,6 +331,10 @@
                 }, 600);
             } catch (e) { addMsg('coach', "⚠️ Connection Error. Please try again."); }
             finally { document.getElementById('status-txt').innerText = "Hold to Answer"; }
+        }
+        
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
         }
     </script>
 </body>

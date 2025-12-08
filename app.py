@@ -3,13 +3,16 @@ from flask import Flask, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
-from werkzeug.middleware.proxy_fix import ProxyFix # <--- IMPORT IMPORTANT
+from werkzeug.middleware.proxy_fix import ProxyFix
 from pydub import AudioSegment
 import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import requests
 from urllib.parse import quote
+# Imports pour lecture de CV
+from pypdf import PdfReader
+from docx import Document
 
 # ==========================================
 # CONFIGURATION
@@ -21,7 +24,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key_if_missing") 
 
 if not all([API_KEY, DATABASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET]):
-    print("⚠️ ALERTE SÉCURITÉ : Certaines variables d'environnement sont manquantes sur Render !")
+    print("⚠️ ALERTE : Variables manquantes sur Render !")
 
 MODEL_NAME = 'gemini-2.5-flash'
 COACH_NAME = 'JIS_Recruiter'
@@ -30,10 +33,19 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = SECRET_KEY
 CORS(app)
 
-# --- FIX POUR RENDER / HTTPS (Indispensable pour l'erreur CSRF) ---
+# FIX: HTTPS sur Render (Indispensable pour Auth Google)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-# ------------------------------------------------------------------
 
+# FIX: Content Security Policy pour autoriser PayPal et Tailwind
+@app.after_request
+def add_header(response):
+    response.headers['Content-Security-Policy'] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"
+    # Cache pour fav.png et videos
+    if request.path.endswith('.mp4') or request.path.endswith('.png'):
+        response.cache_control.max_age = 31536000
+    return response
+
+# --- AUTH INIT ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 oauth = OAuth(app)
@@ -43,24 +55,18 @@ google = oauth.register(
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    api_base_url='https://www.googleapis.com/oauth2/v1/', 
     client_kwargs={'scope': 'openid email profile'},
+    api_base_url='https://www.googleapis.com/oauth2/v1/',
 )
 
 if API_KEY: genai.configure(api_key=API_KEY)
 
-@app.after_request
-def add_header(response):
-    if request.path.startswith('/') and (request.path.endswith('.mp4') or request.path.endswith('.png')):
-        response.cache_control.max_age = 31536000
-        response.cache_control.public = True
-    return response
-
+# --- DATABASE ---
 def get_db_connection():
     try:
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     except Exception as e:
-        print(f"⚠️ DB ERROR: {e}")
+        print(f"DB ERROR: {e}")
         return None
 
 def init_db():
@@ -68,26 +74,11 @@ def init_db():
     if not conn: return
     try:
         cur = conn.cursor()
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                google_id TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                name TEXT,
-                cv_content TEXT,
-                sub_expires TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        ''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, google_id TEXT UNIQUE, email TEXT UNIQUE, name TEXT, cv_content TEXT, sub_expires TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         cur.execute('''CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, user_id INTEGER, candidate_name TEXT, job_title TEXT, company_type TEXT, cv_content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         cur.execute('''CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
-        
-        try:
-            cur.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
-        except:
-            conn.rollback()
-            pass
-        
+        try: cur.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
+        except: conn.rollback()
         conn.commit()
         conn.close()
     except Exception as e: print(f"DB INIT ERROR: {e}")
@@ -101,7 +92,6 @@ class User(UserMixin):
         self.name = name
         self.cv_content = cv_content
         self.sub_expires = sub_expires
-
     @property
     def is_paid(self):
         if not self.sub_expires: return False
@@ -118,85 +108,83 @@ def load_user(user_id):
     if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
     return None
 
+# --- ROUTES ---
+
+@app.route('/upload_cv', methods=['POST'])
+@login_required
+def upload_cv():
+    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({"error": "No filename"}), 400
+    
+    text = ""
+    try:
+        filename = file.filename.lower()
+        if filename.endswith('.pdf'):
+            reader = PdfReader(file)
+            for page in reader.pages: text += page.extract_text() + "\n"
+        elif filename.endswith('.docx'):
+            doc = Document(file)
+            for para in doc.paragraphs: text += para.text + "\n"
+        elif filename.endswith('.txt'):
+            text = file.read().decode('utf-8', errors='ignore')
+        else:
+            return jsonify({"error": "Format not supported"}), 400
+            
+        return jsonify({"status": "ok", "text": text[:10000]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/login/google')
 def login_google():
-    redirect_uri = url_for('authorize', _external=True)
-    return google.authorize_redirect(redirect_uri)
+    return google.authorize_redirect(url_for('authorize', _external=True))
 
 @app.route('/auth/callback')
 def authorize():
     try:
         token = google.authorize_access_token()
-        resp = google.get('userinfo') 
+        resp = google.get('userinfo')
         user_info = resp.json()
-        
-        google_id = user_info['id']
-        email = user_info['email']
-        name = user_info['name']
-
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s)
-            ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name
-            RETURNING *;
-        """, (google_id, email, name))
+        cur.execute("INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s) ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name RETURNING *;", 
+                   (user_info['id'], user_info['email'], user_info['name']))
         u = cur.fetchone()
         conn.commit()
         conn.close()
-
-        user_obj = User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
-        login_user(user_obj)
+        login_user(User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires']))
         return redirect('/')
-    except Exception as e:
-        return f"Auth Error: {e}"
+    except Exception as e: return f"Auth Error: {e}"
 
 @app.route('/logout')
 @login_required
-def logout():
-    logout_user()
-    return redirect('/')
+def logout(): logout_user(); return redirect('/')
 
 @app.route('/api/payment_success', methods=['POST'])
 @login_required
 def payment_success():
-    days = 90
-    new_expiry = datetime.datetime.now() + datetime.timedelta(days=days)
-    conn = get_db_connection()
-    cur = conn.cursor()
+    new_expiry = datetime.datetime.now() + datetime.timedelta(days=90)
+    conn = get_db_connection(); cur = conn.cursor()
     cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (new_expiry, current_user.id))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "ok", "new_expiry": new_expiry.isoformat()})
+    conn.commit(); conn.close()
+    return jsonify({"status": "ok"})
 
 @app.route('/api/promo_code', methods=['POST'])
 @login_required
 def promo_code():
-    d = request.json
-    code = d.get('code', '').upper()
+    code = request.json.get('code', '').upper()
     if code == "ZEROMONEY":
-        days = 3650 
-        new_expiry = datetime.datetime.now() + datetime.timedelta(days=days)
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (new_expiry, current_user.id))
-        conn.commit()
-        conn.close()
-        return jsonify({"status": "free_access_granted", "message": "Access granted for 10 years."}), 200
-    elif code == "FIFTYFIFTY":
-        return jsonify({"status": "discount_applied", "message": "50% Discount Applied."}), 200
-    return jsonify({"status": "invalid", "message": "Invalid Code."}), 400
+        conn = get_db_connection(); cur = conn.cursor()
+        cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (datetime.datetime.now() + datetime.timedelta(days=3650), current_user.id))
+        conn.commit(); conn.close()
+        return jsonify({"status": "free_access_granted", "message": "10 Years Access Granted"})
+    elif code == "FIFTYFIFTY": return jsonify({"status": "discount_applied", "message": "50% Discount Applied"})
+    return jsonify({"status": "invalid", "message": "Invalid Code"}), 400
 
 @app.route('/api/me')
 def get_me():
-    if not current_user.is_authenticated:
-        return jsonify({"logged_in": False})
-    return jsonify({
-        "logged_in": True,
-        "name": current_user.name,
-        "is_paid": current_user.is_paid,
-        "saved_cv": current_user.cv_content
-    })
+    if not current_user.is_authenticated: return jsonify({"logged_in": False})
+    return jsonify({"logged_in": True, "name": current_user.name, "is_paid": current_user.is_paid, "saved_cv": current_user.cv_content})
 
 def generate_tts(text):
     try:
@@ -213,13 +201,9 @@ def get_prompt(name, job, company, cv, history_len):
     if history_len > 10: stage = "SOFT SKILLS"
     if history_len > 14: stage = "CLOSING"
     cv_context = f"\n=== CANDIDATE CV ===\n{cv[:5000]}\n=== END CV ===\n" if cv else ""
-    return (
-        f"ROLE: You are an expert recruiter for JOB ITV SIMULATOR at {company}. Interviewing {name} for {job}.\n" 
-        f"CURRENT STAGE: {stage}.\n{cv_context}"
-        "GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
-        "RULES: Ask ONE short question at a time (max 15 words). Follow flow. Use CV facts.\n"
-        "JSON OUTPUT: {'coach_response_text': '...', 'transcription_user': '...', 'score_pronunciation': 0-10, 'feedback_grammar': '...', 'better_response_example': '...', 'next_step_advice': '...'}"
-    )
+    return (f"ROLE: You are an expert recruiter for JOB ITV SIMULATOR at {company}. Interviewing {name} for {job}.\n" 
+            f"CURRENT STAGE: {stage}.\n{cv_context} GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
+            "JSON OUTPUT: {'coach_response_text': '...', 'transcription_user': '...', 'score_pronunciation': 0-10, 'feedback_grammar': '...', 'better_response_example': '...', 'next_step_advice': '...'}")
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')
@@ -230,17 +214,15 @@ def health(): return jsonify({"status": "alive"})
 @app.route('/start_chat', methods=['POST'])
 @login_required
 def start_chat():
-    # Note: On laisse passer si is_paid est True
     if not current_user.is_paid: return jsonify({"error": "Payment required"}), 403
     d = request.json
-    sid = d.get('session_id')
     cv_content = d.get('cv_content')
     conn = get_db_connection()
     cur = conn.cursor()
     if cv_content: cur.execute("UPDATE users SET cv_content = %s WHERE id = %s", (cv_content, current_user.id))
     else: cv_content = current_user.cv_content
     cur.execute("INSERT INTO sessions (session_id, user_id, candidate_name, job_title, company_type, cv_content) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (session_id) DO NOTHING", 
-               (sid, current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), cv_content))
+               (d.get('session_id'), current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), cv_content))
     conn.commit()
     conn.close()
     msg = f"Hello {d.get('candidate_name')}. Welcome to JOB ITV SIMULATOR. Let's start. Briefly introduce yourself."
@@ -252,20 +234,17 @@ def analyze():
     if not current_user.is_paid: return jsonify({"error": "Payment required"}), 403
     sid = request.form.get('session_id')
     f = request.files.get('audio')
-    if not f or not sid: return jsonify({"error": "No audio"}), 400
+    if not f: return jsonify({"error": "No audio"}), 400
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
-        f.save(tmp.name)
-        webm_path = tmp.name
+        f.save(tmp.name); webm_path = tmp.name
     mp3_path = webm_path + ".mp3"
     try:
         AudioSegment.from_file(webm_path).export(mp3_path, format="mp3")
-        conn = get_db_connection()
-        cur = conn.cursor()
+        conn = get_db_connection(); cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
         sess = cur.fetchone()
         cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC", (sid,))
-        hist_rows = cur.fetchall()
-        conn.close()
+        hist_rows = cur.fetchall(); conn.close()
         hist = [{"role": r['role'], "parts": [r['content']]} for r in hist_rows[-10:]]
         sys_prompt = get_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(hist_rows))
         model = genai.GenerativeModel(MODEL_NAME, system_instruction=sys_prompt)
@@ -275,12 +254,10 @@ def analyze():
         resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
         try: data = json.loads(resp.text)
         except: data = json.loads(resp.text.replace('```json', '').replace('```', '').strip())
-        conn = get_db_connection()
-        cur = conn.cursor()
+        conn = get_db_connection(); cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s)", (sid, data.get('transcription_user','')))
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'model', %s)", (sid, data.get('coach_response_text','')))
-        conn.commit()
-        conn.close()
+        conn.commit(); conn.close()
         data['audio_base64'] = generate_tts(data.get('coach_response_text'))
         return jsonify(data)
     except Exception as e: return jsonify({"error": str(e)}), 500
