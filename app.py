@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
+from werkzeug.middleware.proxy_fix import ProxyFix # <--- IMPORT IMPORTANT
 from pydub import AudioSegment
 import google.generativeai as genai
 import psycopg2
@@ -11,7 +12,7 @@ import requests
 from urllib.parse import quote
 
 # ==========================================
-# CONFIGURATION SÉCURISÉE (VIA ENVIRONNEMENT)
+# CONFIGURATION
 # ==========================================
 API_KEY = os.getenv("GOOGLE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -22,15 +23,17 @@ SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key_if_missing")
 if not all([API_KEY, DATABASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET]):
     print("⚠️ ALERTE SÉCURITÉ : Certaines variables d'environnement sont manquantes sur Render !")
 
-MODEL_NAME = 'gemini-2.5-flash' # Modèle le plus récent
-COACH_NAME = 'JIS_Recruiter' # Nom interne du rôle AI (ne s'affiche pas)
+MODEL_NAME = 'gemini-2.5-flash'
+COACH_NAME = 'JIS_Recruiter'
 
-# --- DÉBUT DE L'APPLICATION FLASK (CRITIQUE : DOIT ÊTRE ICI) ---
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = SECRET_KEY
 CORS(app)
 
-# --- INIT AUTH & LOGIN ---
+# --- FIX POUR RENDER / HTTPS (Indispensable pour l'erreur CSRF) ---
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+# ------------------------------------------------------------------
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 oauth = OAuth(app)
@@ -46,7 +49,6 @@ google = oauth.register(
 
 if API_KEY: genai.configure(api_key=API_KEY)
 
-# --- CACHE OPTIMIZATION (PWA) ---
 @app.after_request
 def add_header(response):
     if request.path.startswith('/') and (request.path.endswith('.mp4') or request.path.endswith('.png')):
@@ -54,10 +56,8 @@ def add_header(response):
         response.cache_control.public = True
     return response
 
-# --- DATABASE ---
 def get_db_connection():
     try:
-        # FIX CRITIQUE: On retire sslmode='require' car il est déjà dans la DATABASE_URL
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     except Exception as e:
         print(f"⚠️ DB ERROR: {e}")
@@ -68,7 +68,6 @@ def init_db():
     if not conn: return
     try:
         cur = conn.cursor()
-        # 1. Création ou vérification des tables
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -83,12 +82,9 @@ def init_db():
         cur.execute('''CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, user_id INTEGER, candidate_name TEXT, job_title TEXT, company_type TEXT, cv_content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         cur.execute('''CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         
-        # 2. FIX SCHEMA : AJOUTER LA COLONNE USER_ID SI ELLE MANQUE (Réparation de l'erreur)
         try:
             cur.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
-            print("✅ Colonne 'user_id' ajoutée à la table sessions (Correction de l'ancienne erreur).")
-        except (psycopg2.errors.DuplicateColumn, psycopg2.errors.SyntaxError):
-            # C'est normal si la colonne existe déjà ou si la commande plante pour une autre raison
+        except:
             conn.rollback()
             pass
         
@@ -98,7 +94,6 @@ def init_db():
 
 init_db()
 
-# --- USER CLASS (Flask-Login) ---
 class User(UserMixin):
     def __init__(self, id, email, name, cv_content, sub_expires):
         self.id = id
@@ -123,16 +118,9 @@ def load_user(user_id):
     if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
     return None
 
-# ==========================================
-# DÉFINITION DES ROUTES
-# ==========================================
-
-# --- AUTH ROUTES ---
 @app.route('/login/google')
 def login_google():
     redirect_uri = url_for('authorize', _external=True)
-    if redirect_uri.startswith('http://') and 'onrender' in redirect_uri:
-        redirect_uri = redirect_uri.replace('http://', 'https://')
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/auth/callback')
@@ -169,7 +157,6 @@ def logout():
     logout_user()
     return redirect('/')
 
-# --- PAYMENT ROUTES ---
 @app.route('/api/payment_success', methods=['POST'])
 @login_required
 def payment_success():
@@ -187,23 +174,19 @@ def payment_success():
 def promo_code():
     d = request.json
     code = d.get('code', '').upper()
-    
     if code == "ZEROMONEY":
-        days = 3650 # 10 ans d'accès
+        days = 3650 
         new_expiry = datetime.datetime.now() + datetime.timedelta(days=days)
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (new_expiry, current_user.id))
         conn.commit()
         conn.close()
-        return jsonify({"status": "free_access_granted", "message": "Accès de 10 ans débloqué. Bienvenue !"}), 200
-        
+        return jsonify({"status": "free_access_granted", "message": "Access granted for 10 years."}), 200
     elif code == "FIFTYFIFTY":
-        return jsonify({"status": "discount_applied", "message": "Félicitations ! Votre code 50% est activé."}), 200
+        return jsonify({"status": "discount_applied", "message": "50% Discount Applied."}), 200
+    return jsonify({"status": "invalid", "message": "Invalid Code."}), 400
 
-    return jsonify({"status": "invalid", "message": "Code promo invalide."}), 400
-
-# --- API INFO USER ---
 @app.route('/api/me')
 def get_me():
     if not current_user.is_authenticated:
@@ -215,7 +198,6 @@ def get_me():
         "saved_cv": current_user.cv_content
     })
 
-# --- LOGIQUE CORE AI ---
 def generate_tts(text):
     try:
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:500])}"
@@ -248,6 +230,7 @@ def health(): return jsonify({"status": "alive"})
 @app.route('/start_chat', methods=['POST'])
 @login_required
 def start_chat():
+    # Note: On laisse passer si is_paid est True
     if not current_user.is_paid: return jsonify({"error": "Payment required"}), 403
     d = request.json
     sid = d.get('session_id')
