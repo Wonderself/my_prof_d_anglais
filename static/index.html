@@ -8,20 +8,28 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://www.paypal.com/sdk/js?client-id=AZ9ifPDjtUGz_lb_6TqcL2nvt14lnadNSq6CRxVqP3FuoMapBoNhuRRIC-HZ1tRWhX9KY2UCT15cuh48&currency=EUR"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=AVaXhjiQjRN4YKxQnkh1jBWfgWDNjA23YLd3SAUGPBDlDyjOeswmF1D0n0LnyniKbLa_HkZGB9vXAHuv&currency=EUR"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
         :root { --primary: #0071e3; --bg: #f5f5f7; }
         body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; color: #1d1d1f; }
+        
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
         .bubble { max-width: 85%; padding: 14px 18px; font-size: 15px; line-height: 1.5; position: relative; word-wrap: break-word; }
         .bubble-coach { background: #fff; border-radius: 18px 18px 18px 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #1d1d1f; margin-right: auto; }
         .bubble-user { background: #0071e3; border-radius: 18px 18px 4px 18px; color: white; margin-left: auto; }
+        
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.4); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Effet flou pour la Masterclass */
+        .blur-reveal { filter: blur(6px); cursor: pointer; transition: all 0.3s ease; user-select: none; }
+        .blur-reveal:hover { filter: blur(3px); }
+        .blur-reveal.revealed { filter: blur(0); cursor: text; user-select: text; }
     </style>
 </head>
 <body>
@@ -92,18 +100,23 @@
     </div>
 
     <div id="chat-interface" class="fixed inset-0 bg-white z-20 flex flex-col hidden">
-        <header class="glass sticky top-0 z-10 p-4 flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-3">
-                <button onclick="if(confirm('Quit?')) location.reload()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500"><i class="fas fa-chevron-left"></i></button>
-                <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 border border-white shadow-sm relative">
-                    <video id="avatar-video" src="/idle.mp4" loop muted playsinline class="w-full h-full object-cover"></video>
-                </div>
-                <div><h3 class="font-bold text-sm leading-tight">AI Recruiter</h3><p class="text-[10px] text-green-500 font-bold uppercase tracking-wider">Online</p></div>
+        <header class="glass sticky top-0 z-10 p-4 flex flex-col items-center justify-center shadow-sm">
+            <div class="flex items-center w-full relative mb-2">
+                 <button onclick="if(confirm('Quit?')) location.reload()" class="absolute left-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500"><i class="fas fa-chevron-left"></i></button>
+                 <div class="mx-auto text-center">
+                    <h3 class="font-bold text-sm leading-tight">AI Recruiter</h3>
+                    <p class="text-[10px] text-green-500 font-bold uppercase tracking-wider">Online</p>
+                 </div>
+            </div>
+            <div class="w-32 h-32 rounded-full overflow-hidden bg-gray-200 border-4 border-white shadow-lg relative">
+                <video id="avatar-video" src="/idle.mp4" loop muted playsinline class="w-full h-full object-cover"></video>
             </div>
         </header>
-        <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-6 pb-32 bg-[#f5f5f7] no-scrollbar"></main>
+
+        <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-6 pb-40 bg-[#f5f5f7] no-scrollbar"></main>
+
         <footer class="absolute bottom-0 w-full p-6 glass rounded-t-[32px] flex flex-col items-center justify-center">
-            <p id="mic-status" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Tap to Speak</p>
+            <p id="mic-status" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Hold to Speak</p>
             <button id="mic-btn" class="w-20 h-20 rounded-full bg-[#0071e3] text-white text-2xl shadow-2xl shadow-blue-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95"><i class="fas fa-microphone"></i></button>
         </footer>
     </div>
@@ -178,9 +191,11 @@
 
         function playAudio(b64) {
             const audio = new Audio("data:audio/mp3;base64," + b64);
-            avatar.src = "/talk.mp4"; avatar.play();
+            avatar.src = "/talk.mp4"; 
+            avatar.play().catch(e => console.log("Video play interrupted")); // Fix pour l'erreur AbortError
+            
             audio.onended = () => { avatar.src = "/idle.mp4"; avatar.play(); };
-            audio.play().catch(e => console.log("Autoplay blocked", e));
+            audio.play().catch(e => console.log("Audio play blocked"));
         }
 
         function addMessage(role, text, feedback=null) {
@@ -188,7 +203,23 @@
             let html = `<div class="w-full flex ${role==='coach'?'justify-start':'justify-end'} fade-in"><div class="bubble ${role==='coach'?'bubble-coach':'bubble-user'}">${text}</div></div>`;
             if(feedback) {
                 const color = feedback.score >= 8 ? 'text-green-500' : 'text-orange-500';
-                html += `<div class="w-full flex justify-start fade-in mt-2 mb-4"><div class="bg-white p-4 rounded-2xl shadow-sm text-xs text-gray-600 max-w-[85%] border border-gray-100"><div class="flex justify-between mb-2"><span class="font-bold">FEEDBACK</span> <span class="font-bold ${color}">${feedback.score}/10</span></div><div class="mb-2"><span class="text-red-400 font-bold">TIP:</span> ${feedback.tip}</div><div class="italic text-gray-400">"${feedback.better}"</div></div></div>`;
+                html += `
+                <div class="w-full flex justify-start fade-in mt-2 mb-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm text-xs text-gray-600 max-w-[90%] border border-gray-100">
+                        <div class="flex justify-between mb-2 border-b border-gray-100 pb-2">
+                            <span class="font-bold">PRONUNCIATION SCORE</span> 
+                            <span class="font-bold ${color} text-lg">${feedback.score}<span class="text-xs text-gray-300">/10</span></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="text-blue-500 font-bold uppercase text-[10px]">Strategic Tip</span>
+                            <p class="mt-1">${feedback.tip}</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <span class="text-gray-400 font-bold uppercase text-[10px] mb-1 block">Masterclass Answer (Click to reveal)</span>
+                            <div class="italic text-gray-600 blur-reveal" onclick="this.classList.add('revealed')">"${feedback.better}"</div>
+                        </div>
+                    </div>
+                </div>`;
             }
             box.insertAdjacentHTML('beforeend', html);
             box.scrollTo({top: box.scrollHeight, behavior: 'smooth'});
@@ -220,19 +251,31 @@
             mediaRecorder.stream.getTracks().forEach(track => track.stop());
             mediaRecorder.onstop = async () => {
                 const blob = new Blob(audioChunks, {type: 'audio/webm'});
+                
+                // Evite d'envoyer des fichiers vides (ce qui causait l'erreur 500)
+                if (blob.size < 1000) {
+                     statusTxt.innerText = "Too short. Tap again.";
+                     return;
+                }
+
                 const fd = new FormData();
                 fd.append('audio', blob); fd.append('session_id', sessionId);
                 try {
                     addMessage('user', '...'); 
                     const res = await fetch('/analyze', {method: 'POST', body: fd});
+                    
+                    if (!res.ok) throw new Error("Server Error"); // Gère le cas où le serveur plante
+                    
                     const d = await res.json();
                     document.querySelector('.bubble-user:last-child').innerText = d.transcription_user;
                     setTimeout(() => {
                         addMessage('coach', d.coach_response_text, { score: d.score_pronunciation, tip: d.next_step_advice, better: d.better_response_example });
                         if(d.audio_base64) playAudio(d.audio_base64);
                     }, 500);
-                } catch(e) { statusTxt.innerText = "Error. Try again."; }
-                finally { statusTxt.innerText = "Tap to Speak"; }
+                } catch(e) { 
+                    document.querySelector('.bubble-user:last-child').innerText = "⚠️ Error analyzing. Please try again.";
+                }
+                finally { statusTxt.innerText = "Hold to Speak"; }
             };
         }
     </script>
