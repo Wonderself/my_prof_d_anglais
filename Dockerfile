@@ -2,13 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Installation minimale
+# On installe juste Flask
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# On copie le code
 COPY . .
 
+# On dit à Render qu'on est sur le port 10000
+ENV PORT=10000
 EXPOSE 10000
 
-# Lancement avec logs détaillés
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:10000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
+# COMMANDE DIRECTE (Pas de Gunicorn)
+# Cela permet de voir les erreurs instantanément sans filtre
+CMD ["python", "app.py"]

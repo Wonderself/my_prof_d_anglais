@@ -1,35 +1,23 @@
 import os
 import sys
-import logging
-from flask import Flask, jsonify
-import psycopg2
+from flask import Flask
 
-# Configuration des logs pour voir tout ce qui se passe
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-logger = logging.getLogger(__name__)
+# On force l'affichage immédiat des logs (flush=True)
+print(">>> INITIALISATION DU SQUELETTE...", flush=True)
 
 app = Flask(__name__)
 
 @app.route('/')
-def index():
-    return "<h1>SERVER ONLINE</h1><p>Reset successful.</p>"
+def home():
+    return "<h1>ALIVE</h1><p>Le serveur fonctionne.</p>"
 
 @app.route('/health')
 def health():
-    logger.info(">>> HEALTH CHECK: PING RECEIVED")
-    return jsonify({"status": "alive"}), 200
-
-@app.route('/test_db')
-def test_db():
-    # Test de connexion à Neon
-    db_url = os.getenv("DATABASE_URL")
-    try:
-        conn = psycopg2.connect(db_url)
-        conn.close()
-        return "DATABASE CONNECTED ✅"
-    except Exception as e:
-        return f"DATABASE ERROR ❌: {str(e)}"
+    print(">>> PING HEALTH CHECK REÇU", flush=True)
+    return "OK", 200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
+    print(f">>> DÉMARRAGE SUR LE PORT {port}...", flush=True)
+    # host='0.0.0.0' est OBLIGATOIRE pour Docker
     app.run(host='0.0.0.0', port=port)
