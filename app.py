@@ -4,7 +4,7 @@ from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
 from werkzeug.middleware.proxy_fix import ProxyFix
-# On n'utilise plus pydub pour la conversion, on envoie direct à Gemini
+from pydub import AudioSegment
 import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -235,20 +235,36 @@ def analyze():
     
     if not f: return jsonify({"error": "No audio"}), 400
     
-    # 2. SAUVEGARDE DIRECTE EN WEBM (Pas de conversion locale -> Moins d'erreurs)
-    tw = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
+    # 2. SAUVEGARDE UNIVERSELLE (SANS EXTENSION AU DÉBUT)
+    # On utilise un fichier temporaire neutre pour laisser FFmpeg deviner le format
+    raw_audio = tempfile.NamedTemporaryFile(delete=False)
+    mp3_audio = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
     
     try:
-        f.save(tw.name)
-        tw.close()
+        f.save(raw_audio.name)
+        raw_audio.close() # Close handle
         
-        file_size = os.path.getsize(tw.name)
+        file_size = os.path.getsize(raw_audio.name)
         logger.info(f"Audio received: {file_size} bytes")
         
-        if file_size < 500: # Fichier trop petit = silence ou bug
-            return jsonify({"error": "Audio too short"}), 400
+        if file_size < 500: return jsonify({"error": "Audio too short"}), 400
 
-        # 3. CONTEXTE DB
+        # 3. LA LESSIVEUSE (CONVERSION FORCEE EN MP3)
+        # On ne précise pas le format d'entrée (from_file sans format), pydub va sniffer le header
+        # C'est ça qui sauve la mise pour l'iPhone (qui envoie du mp4 déguisé)
+        logger.info(">>> STARTING CONVERSION (AUTO DETECT)")
+        try:
+            sound = AudioSegment.from_file(raw_audio.name)
+            sound = sound.set_frame_rate(16000).set_channels(1) # Standardisation
+            sound.export(mp3_audio.name, format="mp3")
+            logger.info(">>> CONVERSION SUCCESS")
+        except Exception as e:
+            logger.error(f"FFMPEG ERROR: {e}")
+            return jsonify({"error": "Audio format not supported. Try Chrome/Safari."}), 400
+        
+        mp3_audio.close()
+
+        # 4. CONTEXTE DB
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
@@ -259,36 +275,24 @@ def analyze():
         
         hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
         
-        # 4. GEMINI (Upload direct du WebM)
+        # 5. GEMINI
         sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
         
-        # On envoie le fichier WebM tel quel, Gemini sait le lire !
-        uf = genai.upload_file(tw.name, mime_type="audio/webm")
-        
-        # Attente active
+        uf = genai.upload_file(mp3_audio.name, mime_type="audio/mp3")
         while uf.state.name == "PROCESSING": time.sleep(0.5); uf = genai.get_file(uf.name)
         
-        if uf.state.name == "FAILED":
-            raise Exception("Gemini refused the audio file")
+        if uf.state.name == "FAILED": raise Exception("Gemini refused audio")
 
         resp = chat.send_message([uf, "Analyze this answer."], generation_config={"response_mime_type": "application/json"})
         
         try:
             data = json.loads(resp.text.replace('```json','').replace('```','').strip())
         except:
-            # Fallback si l'IA délire
-            data = {
-                "coach_response_text": "I understood what you said, but let's move on. What are your main strengths?",
-                "transcription_user": "(Analysis skipped)",
-                "score_pronunciation": 7,
-                "feedback_grammar": "None",
-                "better_response_example": "Focus on strengths relevant to the job.",
-                "next_step_advice": "Be concise."
-            }
+            data = {"coach_response_text": "I understood, but let's move on. What are your strengths?", "transcription_user": "(Analysis skipped)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "Focus on your strengths.", "next_step_advice": "Be concise."}
 
-        # 5. SAVE & RETURN
+        # 6. SAVE & RETURN
         conn = get_db_connection(); cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
                    (sid, data.get('transcription_user', ''), sid, data.get('coach_response_text', '')))
@@ -299,18 +303,18 @@ def analyze():
 
     except Exception as e:
         logger.error(f"CRITICAL ERROR: {str(e)}")
-        # On renvoie un JSON valide même en cas d'erreur pour ne pas casser le JS
         return jsonify({
-            "coach_response_text": "I'm having trouble hearing you clearly. Could you repeat please?",
+            "coach_response_text": "I'm having trouble hearing you. Could you repeat?",
             "transcription_user": "(Technical Error)",
             "score_pronunciation": 0,
             "feedback_grammar": "Check microphone",
             "better_response_example": "N/A",
-            "next_step_advice": "Check internet connection"
+            "next_step_advice": "Check internet"
         })
         
     finally:
-        if os.path.exists(tw.name): os.remove(tw.name)
+        if os.path.exists(raw_audio.name): os.remove(raw_audio.name)
+        if os.path.exists(mp3_audio.name): os.remove(mp3_audio.name)
 
 # --- PAYMENT & PROMO ---
 @app.route('/api/payment_success', methods=['POST'])
