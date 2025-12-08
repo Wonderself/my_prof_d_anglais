@@ -111,7 +111,6 @@ def load_user(user_id):
 # --- AI LOGIC (PROMPT MASTERCLASS) ---
 def generate_tts(text):
     try:
-        # TTS via Google Translate API (Hack gratuit mais efficace)
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:900])}"
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
         if r.status_code == 200: return base64.b64encode(r.content).decode('utf-8')
@@ -119,42 +118,33 @@ def generate_tts(text):
     return None
 
 def get_ai_prompt(name, job, company, cv, history_len):
-    # DYNAMIQUE DU STAGE
     stage = "INTRODUCTION"
-    if history_len >= 2: stage = "EXPERIENCE DEEP DIVE (Dig into CV details)"
-    if history_len >= 6: stage = "CHALLENGE (Technical/Behavioral)"
+    if history_len >= 2: stage = "EXPERIENCE DEEP DIVE"
+    if history_len >= 6: stage = "CHALLENGE"
     if history_len >= 10: stage = "CLOSING"
 
-    cv_text = cv[:6000] if cv else "NO CV PROVIDED. Ask generic questions."
+    cv_text = cv[:6000] if cv else "NO CV PROVIDED."
     
-    # LE PROMPT "MASTERCLASS"
     return f"""
-    ROLE: You are an Elite Tech Recruiter at {company}. You are interviewing {name} for the role of {job}.
-    TONE: Professional, concise, slightly intimidating but fair. You speak realistic English (not robotic).
+    ROLE: You are an Elite Tech Recruiter at {company}. Interviewing {name} for {job}.
+    TONE: Professional, concise, fair but tough.
+    STAGE: {stage}
+    CV: "{cv_text}"
     
-    CURRENT STAGE: {stage}
-    
-    CANDIDATE CV: 
-    "{cv_text}"
-    
-    YOUR MISSION:
-    1. ANALYZE the user's last answer (audio transcription).
-    2. COMPARE it to their CV. Did they lie? Did they miss a detail mentioned in the CV?
-    3. ASK the next question based on the CV. Do not ask generic questions. Point to specific lines in their CV.
-    4. GENERATE A "MASTERCLASS" EXAMPLE: What would be the PERFECT answer to the question you just asked?
-    
-    RULES:
-    - Keep your spoken response SHORT (max 2-3 sentences). This is a conversation, not a monologue.
-    - If the user's English is bad, give a low score but continue the interview.
+    MISSION:
+    1. Analyze the audio transcription.
+    2. Compare with CV.
+    3. Ask a specific, relevant next question.
+    4. Provide a "MASTERCLASS" example answer hidden in the JSON.
     
     OUTPUT JSON FORMAT (STRICT):
     {{
-        "coach_response_text": "Your spoken question to the candidate.",
-        "transcription_user": "What you understood from the audio.",
-        "score_pronunciation": (integer 0-10),
-        "feedback_grammar": "Correction of their mistake (if any).",
-        "better_response_example": "The MASTERCLASS answer. How a top 1% candidate would have answered using the CV details provided.",
-        "next_step_advice": "A quick strategic tip."
+        "coach_response_text": "Your spoken question.",
+        "transcription_user": "What you understood.",
+        "score_pronunciation": (0-10),
+        "feedback_grammar": "Correction.",
+        "better_response_example": "THE MASTERCLASS ANSWER.",
+        "next_step_advice": "Strategic tip."
     }}
     """
 
@@ -222,112 +212,103 @@ def start_chat():
     d = request.json
     conn = get_db_connection(); cur = conn.cursor()
     
-    # Save CV only if new one provided
-    final_cv = d.get('cv_content')
-    if final_cv: 
-        cur.execute("UPDATE users SET cv_content = %s WHERE id = %s", (final_cv, current_user.id))
-    else:
-        final_cv = current_user.cv_content
-        
+    final_cv = d.get('cv_content') or current_user.cv_content
+    cur.execute("UPDATE users SET cv_content = %s WHERE id = %s", (final_cv, current_user.id))
     cur.execute("INSERT INTO sessions (session_id, user_id, candidate_name, job_title, company_type, cv_content) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (session_id) DO NOTHING", 
                (d.get('session_id'), current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), final_cv))
     conn.commit(); conn.close()
     
-    # FIRST MESSAGE LOGIC
-    intro_prompt = f"You are a recruiter at {d.get('company_type')}. The candidate {d.get('candidate_name')} is here for {d.get('job_title')}. Start with a short, professional greeting and ask them to introduce themselves briefly."
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resp = model.generate_content(intro_prompt)
-        msg = resp.text
-    except:
-        msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter. Tell me about yourself."
-        
+    msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter for {d.get('company_type')}. Let's discuss your application for {d.get('job_title')}. Please introduce yourself."
     return jsonify({"coach_response_text": msg, "audio_base64": generate_tts(msg)})
 
 @app.route('/analyze', methods=['POST'])
 @login_required
 def analyze():
-    # 1. CHECK PAYMENT
+    # LOGS D'ENTRÉE POUR DÉBUGGER
+    logger.info(">>> ANALYZE REQUEST RECEIVED")
+    
     if not current_user.is_paid: return jsonify({"error": "Pay first"}), 403
     
-    # 2. GET INPUTS
     sid = request.form.get('session_id')
     f = request.files.get('audio')
-    if not f: return jsonify({"error": "No audio file"}), 400
     
+    if not f: 
+        logger.error(">>> NO AUDIO FILE")
+        return jsonify({"error": "No audio file"}), 400
+    
+    # SETUP FILES
     tw = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
     tm = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
     
     try:
-        # 3. SAVE & CONVERT AUDIO
+        # SAVE WEB
         f.save(tw.name)
-        tw.close() # Close to allow FFmpeg access
+        tw.close() # Important de fermer le handle avant que pydub ne l'ouvre
         
-        # Check size (if 0 byte, browser failed)
-        if os.path.getsize(tw.name) == 0:
-            return jsonify({"error": "Empty audio received"}), 400
+        file_size = os.path.getsize(tw.name)
+        logger.info(f">>> AUDIO SAVED. Size: {file_size} bytes")
+        
+        if file_size < 100:
+            logger.error(">>> AUDIO FILE TOO SMALL (EMPTY)")
+            return jsonify({"error": "Empty audio"}), 400
 
-        AudioSegment.converter = "/usr/bin/ffmpeg"
+        # CONVERT TO MP3
+        # FIX: On ne force pas le chemin ffmpeg, on laisse pydub le trouver dans le PATH Docker
+        logger.info(">>> STARTING CONVERSION")
         audio = AudioSegment.from_file(tw.name)
         audio.export(tm.name, format="mp3")
-        tm.close()
+        tm.close() # Close file handle
+        logger.info(">>> CONVERSION SUCCESS")
         
-        # 4. GET CONTEXT FROM DB
+        # DB CONTEXT
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
         sess = cur.fetchone()
-        
-        # Get last 6 exchanges for context (avoid token limit)
-        cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC LIMIT 12", (sid,))
+        cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC LIMIT 10", (sid,))
         rows = cur.fetchall()
-        hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
         conn.close()
         
-        # 5. CALL GEMINI
+        hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
+        
+        # GEMINI
+        logger.info(">>> CALLING GEMINI")
         sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
         
         uf = genai.upload_file(tm.name, mime_type="audio/mp3")
-        # Wait for file to be ready (Critical step often missed)
-        while uf.state.name == "PROCESSING": time.sleep(1); uf = genai.get_file(uf.name)
+        while uf.state.name == "PROCESSING": time.sleep(0.5); uf = genai.get_file(uf.name)
         
-        resp = chat.send_message([uf, "Analyze this answer."], generation_config={"response_mime_type": "application/json"})
+        resp = chat.send_message([uf, "Analyze this."], generation_config={"response_mime_type": "application/json"})
         
-        # 6. PARSE JSON
         try:
-            clean_text = resp.text.replace('```json','').replace('```','').strip()
-            data = json.loads(clean_text)
-        except Exception as e:
-            logger.error(f"JSON PARSE ERROR: {resp.text}")
-            # Fallback JSON to avoid frontend crash
-            data = {
-                "coach_response_text": "I heard you, but I'm having trouble analyzing. Could you repeat?",
-                "transcription_user": "(Audio unclear)",
-                "score_pronunciation": 5,
-                "feedback_grammar": "N/A",
-                "better_response_example": "N/A",
-                "next_step_advice": "Try speaking clearer."
-            }
+            data = json.loads(resp.text.replace('```json','').replace('```','').strip())
+        except:
+            data = {"coach_response_text": "I heard you but couldn't analyze clearly. Can you repeat?", "transcription_user": "(Unclear)", "score_pronunciation": 5, "feedback_grammar": "", "better_response_example": "", "next_step_advice": ""}
 
-        # 7. SAVE HISTORY
+        # SAVE
         conn = get_db_connection(); cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
                    (sid, data.get('transcription_user', ''), sid, data.get('coach_response_text', '')))
         conn.commit(); conn.close()
         
-        # 8. GENERATE TTS
         data['audio_base64'] = generate_tts(data.get('coach_response_text', ''))
-        
         return jsonify(data)
 
     except Exception as e:
-        logger.error(f"CRITICAL ERROR /ANALYZE: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f">>> CRITICAL ERROR IN ANALYZE: {str(e)}")
+        # On retourne une 200 avec une erreur JSON pour que le front ne plante pas
+        return jsonify({
+            "coach_response_text": "I'm having technical trouble hearing you. Please try again.",
+            "transcription_user": "(System Error)",
+            "score_pronunciation": 0,
+            "feedback_grammar": "System Error: " + str(e),
+            "better_response_example": "Check server logs",
+            "next_step_advice": "Technical check required"
+        })
         
     finally:
-        # CLEANUP
         if os.path.exists(tw.name): os.remove(tw.name)
         if os.path.exists(tm.name): os.remove(tm.name)
 
