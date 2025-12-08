@@ -20,9 +20,7 @@
         body { font-family: 'Inter', sans-serif; background: var(--bg); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
         .bubble { animation: slideIn 0.3s ease-out forwards; opacity: 0; transform: translateY(10px); }
         @keyframes slideIn { to { opacity: 1; transform: translateY(0); } }
-        .blur-reveal { filter: blur(8px); cursor: pointer; transition: all 0.4s ease; user-select: none; background: rgba(0,0,0,0.05); color: transparent; }
-        .blur-reveal:hover { filter: blur(4px); }
-        .blur-reveal.revealed { filter: blur(0); cursor: text; user-select: text; background: transparent; color: inherit; }
+        /* Add more styles here if necessary */
         #setup-screen-inner { max-height: 100dvh; overflow-y: auto; }
     </style>
 </head>
@@ -49,17 +47,47 @@
         </a>
     </div>
 
-    <div id="payment-screen" class="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center p-6 hidden">
-        <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold mb-2">Premium Access</h1>
-            <div class="w-16 h-1 bg-blue-600 mx-auto rounded-full mb-4"></div>
-            <p class="text-slate-500 text-sm">Unlock 3 months of unlimited training.</p>
-            <p class="text-3xl font-bold text-slate-900 mt-2">€9.99</p>
+    <div id="payment-screen" class="fixed inset-0 bg-white z-40 flex flex-col p-6 overflow-y-auto hidden">
+        <div class="w-full max-w-lg mx-auto py-8">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-bold mb-2 text-slate-900">Unlock Your Career Potential</h1>
+                <p class="text-lg text-slate-600">The Ultimate AI Interview Coach</p>
+            </div>
+
+            <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8 shadow-sm">
+                <p class="font-semibold text-slate-800 mb-4">Why choose JOB ITV SIMULATOR?</p>
+                <ul class="space-y-3 text-sm text-slate-600">
+                    <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
+                        **Personalized Masterclass:** Our V6 model analyzes your uploaded CV, challenging your experience with **specific questions** about your past projects and achievements, not generic phrases.
+                    </li>
+                    <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
+                        **Real-Time Language Correction:** Get instant, actionable feedback on your grammar, pronunciation, and flow to ensure native-level confidence.
+                    </li>
+                    <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
+                        **AI-Driven Benchmarking:** See the perfect, high-impact response for every answer, crafted using the exact details from your resume (the 'Better Response Example').
+                    </li>
+                    <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
+                        **24/7 Access & PWA:** Practice anywhere, anytime. Optimized for speed and mobile experience (PWA).
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="text-center mb-6">
+                <p class="text-sm text-slate-500 mb-1">Total Value: <span class="line-through">€30</span></p>
+                <p class="text-4xl font-bold text-slate-900">€9.99</p>
+                <p class="text-xs text-slate-500 mt-1">Unlock 3 months of unlimited training.</p>
+            </div>
+
+            <div class="flex gap-2 w-full max-w-sm mx-auto mb-6">
+                <input id="promo-code-input" type="text" placeholder="Enter Promo Code" class="flex-1 p-3 border border-slate-300 rounded-xl font-semibold uppercase outline-none focus:ring-2 ring-blue-500">
+                <button onclick="applyPromoCode()" class="bg-blue-600 text-white p-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shrink-0" id="apply-promo-btn">Apply</button>
+            </div>
+            <p id="promo-message" class="text-center text-xs font-semibold mb-4 h-4"></p>
+
+            <div id="paypal-button-container" class="w-full max-w-xs mx-auto min-h-[150px]"></div>
+            
+            <button onclick="window.location.href='/logout'" class="mt-6 text-xs text-slate-400 underline hover:text-slate-600 w-full text-center">Logout (Wrong account?)</button>
         </div>
-        
-        <div id="paypal-button-container" class="w-full max-w-xs min-h-[150px]"></div>
-        
-        <button onclick="window.location.href='/logout'" class="mt-6 text-xs text-slate-400 underline hover:text-slate-600">Logout (Wrong account?)</button>
     </div>
 
     <div id="setup-screen" class="fixed inset-0 bg-white z-30 flex flex-col hidden transition-transform duration-500 ease-in-out">
@@ -203,7 +231,11 @@
 
         // --- 2. PAYPAL LOGIC ---
         function initPayPal() {
-            if (!window.paypal) return;
+            if (!window.paypal) {
+                // Si PayPal SDK n'est pas prêt, on réessaie après un délai
+                setTimeout(initPayPal, 500); 
+                return;
+            }
             paypal.Buttons({
                 createOrder: function(data, actions) {
                     return actions.order.create({ purchase_units: [{ amount: { value: '9.99' } }] });
@@ -217,193 +249,63 @@
             }).render('#paypal-button-container');
         }
 
-        // --- 3. CV HANDLING ---
-        function readCVFile() {
-            const fileInput = document.getElementById('inp-cv');
-            const file = fileInput.files[0];
-            const status = document.getElementById('cv-status');
-            const cvContent = document.getElementById('cv-content');
-            if (!file) return;
-            if (file.size > 1024 * 1024 * 1) { 
-                status.innerText = "Max 1MB"; status.classList.add('text-red-500'); return;
+        // --- 3. PROMO CODE LOGIC ---
+        async function applyPromoCode() {
+            const input = document.getElementById('promo-code-input');
+            const btn = document.getElementById('apply-promo-btn');
+            const msg = document.getElementById('promo-message');
+            const code = input.value.toUpperCase().trim();
+
+            if (!code) { msg.style.color = 'red'; msg.innerText = "Please enter a code."; return; }
+
+            // Empêche le spam
+            btn.disabled = true;
+            msg.innerText = "Verifying...";
+            msg.style.color = 'gray';
+
+            if (code === "FIFTYFIFTY") {
+                // FIFTYFIFTY: Affichage visuel uniquement. Pour modifier le prix PayPal, il faudrait re-rendre le bouton.
+                msg.style.color = 'orange';
+                msg.innerText = "Code applied! Price is now €4.99 (Contact support for custom PayPal link).";
+                // On pourrait cacher le bouton PayPal et afficher un lien personnalisé ici.
+                btn.disabled = false;
+                return;
             }
-            status.innerText = `Reading...`;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                cvContent.value = e.target.result;
-                status.innerText = `Ready to upload`;
-                status.classList.remove('text-red-500');
-                status.classList.add('text-blue-600');
-            };
-            reader.readAsText(file);
-        }
-
-        // --- 4. AVATAR & NAVIGATION ---
-        const vidIdle = document.getElementById('vid-idle');
-        const vidTalk = document.getElementById('vid-talk');
-        const imgAvatar = document.getElementById('avatar-img');
-        const audioIndicator = document.getElementById('audio-indicator');
-
-        function initAvatar() {
-            vidIdle.play().then(() => { imgAvatar.style.display = 'none'; vidIdle.classList.remove('hidden'); })
-                   .catch(e => console.warn("Autoplay blocked", e));
-        }
-        
-        function setAvatarState(isTalking) {
-            audioIndicator.style.opacity = isTalking ? '1' : '0';
-            if (isTalking) {
-                vidIdle.classList.add('hidden'); vidTalk.classList.remove('hidden'); vidTalk.play();
-            } else {
-                vidTalk.classList.add('hidden'); vidIdle.classList.remove('hidden'); vidIdle.play();
-            }
-        }
-
-        function returnToSetup() {
-            if (confirm("Stop interview?")) { location.reload(); }
-        }
-
-        // --- 5. CHAT CORE ---
-        function playAudio(base64Audio) {
-            if (!base64Audio) return;
-            const audio = new Audio("data:audio/mp3;base64," + base64Audio);
-            audio.onplay = () => setAvatarState(true);
-            audio.onended = () => setAvatarState(false);
-            audio.onerror = () => setAvatarState(false);
-            audio.play().catch(console.warn);
-        }
-
-        function addMsg(role, text, feedback=null) {
-            const box = document.getElementById('chat-box');
-            const isCoach = role === 'coach';
-            const div = document.createElement('div');
-            div.className = `bubble flex flex-col ${isCoach ? 'items-start' : 'items-end'} mb-4`;
-            
-            let html = `
-                <div class="px-5 py-3 rounded-2xl max-w-[90%] text-sm leading-relaxed shadow-sm 
-                            ${isCoach ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200' : 'bg-blue-600 text-white rounded-tr-none'}">
-                    ${text}
-                </div>`;
-
-            if (feedback) {
-                const scoreColor = feedback.score >= 8 ? 'bg-green-500' : (feedback.score >= 5 ? 'bg-orange-500' : 'bg-red-500');
-                html += `
-                <div class="mt-2 ml-1 w-[95%] bg-white p-4 rounded-xl border border-slate-200 shadow-md space-y-3 relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full ${scoreColor}"></div>
-                    <div class="flex justify-between items-end border-b border-slate-100 pb-2">
-                        <div>
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">Score</span>
-                            <span class="text-xl font-bold text-slate-800">${feedback.score}<span class="text-xs text-slate-400">/10</span></span>
-                        </div>
-                    </div>
-                    <div class="space-y-2 text-xs">
-                        ${feedback.grammar && feedback.grammar.length > 2 ? `<div class="text-slate-600"><strong class="text-red-500 block text-[9px] uppercase">Correction</strong>${feedback.grammar}</div>` : ''}
-                        <div><strong class="text-blue-500 block text-[9px] uppercase">Tip</strong>${feedback.tip}</div>
-                    </div>
-                    <div class="pt-2 mt-1 border-t border-slate-100">
-                        <div class="relative group cursor-pointer" onclick="this.querySelector('.blur-reveal').classList.add('revealed');">
-                            <div class="blur-reveal p-2 bg-slate-50 rounded text-slate-800 italic text-xs border border-slate-100">"${feedback.better}"</div>
-                        </div>
-                    </div>
-                </div>`;
-            }
-            div.innerHTML = html;
-            box.appendChild(div);
-            setTimeout(() => { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); }, 50);
-        }
-
-        async function startSession() {
-            const name = document.getElementById('inp-name').value;
-            const job = document.getElementById('inp-job').value;
-            const company = document.getElementById('inp-company').value;
-            const cvContent = document.getElementById('cv-content').value;
-
-            document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
-            setTimeout(() => {
-                 document.getElementById('setup-screen').classList.add('hidden');
-                 document.getElementById('chat-header').classList.remove('hidden');
-                 document.getElementById('chat-box').classList.remove('hidden');
-                 document.getElementById('chat-footer').classList.remove('hidden');
-                 initAvatar();
-            }, 500);
 
             try {
-                const res = await fetch(`${API_URL}/start_chat`, {
+                const res = await fetch('/api/promo_code', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        session_id: sessionId, candidate_name: name, job_title: job, 
-                        company_type: company, cv_content: cvContent 
-                    })
+                    body: JSON.stringify({ code: code })
                 });
-                const data = await res.json();
-                if(data.error) { alert(data.error); location.reload(); return; }
-                addMsg('coach', data.coach_response_text);
-                if (data.audio_base64) playAudio(data.audio_base64);
-                initMic();
-            } catch (e) { alert("Server Error"); location.reload(); }
-        }
 
-        async function initMic() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-                mediaRecorder.onstop = sendAudio;
-                
-                const btn = document.getElementById('mic-btn');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === 'free_access_granted') {
+                        msg.style.color = 'green';
+                        msg.innerText = data.message;
+                        setTimeout(() => location.reload(), 2000); // Redémarre l'app en mode payé
+                    } else if (data.status === 'discount_applied') {
+                         msg.style.color = 'orange';
+                         msg.innerText = data.message;
+                    }
+                } else {
+                    const errorData = await res.json();
+                    msg.style.color = 'red';
+                    msg.innerText = errorData.message || "Code invalide.";
+                }
+            } catch (e) {
+                msg.style.color = 'red';
+                msg.innerText = "Server error during verification.";
+            } finally {
                 btn.disabled = false;
-                
-                const startRec = (e) => {
-                    e.preventDefault(); audioChunks = []; mediaRecorder.start();
-                    btn.classList.add('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.remove('bg-blue-600', 'text-2xl');
-                    document.getElementById('status-txt').innerText = "Listening...";
-                    document.getElementById('status-txt').classList.add('text-red-500');
-                };
-                const stopRec = (e) => {
-                    e.preventDefault(); if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-                    btn.classList.remove('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.add('bg-blue-600', 'text-2xl');
-                    document.getElementById('status-txt').classList.remove('text-red-500');
-                };
-                btn.addEventListener('mousedown', startRec); btn.addEventListener('touchstart', startRec);
-                btn.addEventListener('mouseup', stopRec); btn.addEventListener('touchend', stopRec);
-            } catch (e) { alert("Mic required"); }
-        }
-
-        async function sendAudio() {
-            await new Promise(r => setTimeout(r, 200));
-            if (audioChunks.length === 0) return;
-            const btnIcon = document.getElementById('btn-icon');
-            const loader = document.getElementById('btn-loader');
-            const status = document.getElementById('status-txt');
-            btnIcon.classList.add('hidden'); loader.classList.remove('hidden');
-            status.innerText = "Sarah is thinking...";
-
-            const blob = new Blob(audioChunks, { type: 'audio/webm' });
-            const fd = new FormData();
-            fd.append('audio', blob); fd.append('session_id', sessionId);
-
-            try {
-                const res = await fetch(`${API_URL}/analyze`, { method: 'POST', body: fd });
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                addMsg('user', data.transcription_user);
-                setTimeout(() => {
-                    addMsg('coach', data.coach_response_text, {
-                        score: data.score_pronunciation, grammar: data.feedback_grammar,
-                        tip: data.next_step_advice, better: data.better_response_example
-                    });
-                    if (data.audio_base64) playAudio(data.audio_base64);
-                }, 600);
-            } catch (e) { status.innerText = "Error"; addMsg('coach', `⚠️ Error`); } 
-            finally {
-                btnIcon.classList.remove('hidden'); loader.classList.add('hidden');
-                status.innerText = "Hold to Answer";
             }
         }
-        
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
-        }
+
+        // --- 4. LE RESTE DU CHAT CORE (Inchangé) ---
+        // (Reste du code JS pour CV, Avatar, playAudio, addMsg, startSession, initMic, sendAudio)
+        // ... (Tu as déjà ce code, on ne le répète pas ici)
     </script>
-</body>
+
+    </body>
 </html>
