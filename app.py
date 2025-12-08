@@ -239,4 +239,36 @@ def analyze():
         uf = genai.upload_file(tm.name, mime_type="audio/mp3")
         while uf.state.name == "PROCESSING": time.sleep(1); uf = genai.get_file(uf.name)
         
-        resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application
+        resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
+        data = json.loads(resp.text.replace('```json','').replace('```','').strip())
+        
+        conn = get_db_connection(); cur = conn.cursor()
+        cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
+                   (sid, data.get('transcription_user'), sid, data.get('coach_response_text')))
+        conn.commit(); conn.close()
+        data['audio_base64'] = generate_tts(data.get('coach_response_text'))
+        return jsonify(data)
+    except Exception as e: return jsonify({"error": str(e)}), 500
+    finally: 
+        if os.path.exists(tw.name): os.remove(tw.name)
+        if os.path.exists(tm.name): os.remove(tm.name)
+
+# --- PROMOS ---
+@app.route('/api/payment_success', methods=['POST'])
+@login_required
+def pay_ok():
+    conn = get_db_connection(); cur = conn.cursor()
+    cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (datetime.datetime.now() + datetime.timedelta(days=90), current_user.id))
+    conn.commit(); conn.close(); return jsonify({"status": "ok"})
+
+@app.route('/api/promo_code', methods=['POST'])
+@login_required
+def promo():
+    if request.json.get('code','').upper() == "ZEROMONEY":
+        conn = get_db_connection(); cur = conn.cursor()
+        cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (datetime.datetime.now() + datetime.timedelta(days=3650), current_user.id))
+        conn.commit(); conn.close(); return jsonify({"status": "free_access_granted", "message": "VIP Access"})
+    return jsonify({"status": "invalid", "message": "Invalid Code"}), 400
+
+if __name__ == '__main__': 
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
