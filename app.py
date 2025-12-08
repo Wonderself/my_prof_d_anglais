@@ -10,13 +10,17 @@ from psycopg2.extras import RealDictCursor
 import requests
 from urllib.parse import quote
 
-# --- CONFIG ---
+# ==========================================
+# CONFIGURATION SÉCURISÉE (VIA ENVIRONNEMENT)
+# ==========================================
 API_KEY = os.getenv("GOOGLE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-# Clé secrète indispensable pour les sessions Flask
-SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_key_change_me_in_prod") 
+SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key_if_missing") 
+
+if not all([API_KEY, DATABASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET]):
+    print("⚠️ ALERTE SÉCURITÉ : Certaines variables d'environnement sont manquantes sur Render !")
 
 MODEL_NAME = 'gemini-1.5-flash'
 COACH_NAME = 'Sarah'
@@ -34,11 +38,8 @@ google = oauth.register(
     name='google',
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
-    access_token_url='https://accounts.google.com/o/oauth2/token',
-    access_token_params=None,
-    authorize_url='https://accounts.google.com/o/oauth2/auth',
-    authorize_params=None,
-    api_base_url='https://www.googleapis.com/oauth2/v1/',
+    # FIX CRITIQUE : Utilisation de l'URL de découverte standard OpenID
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={'scope': 'openid email profile'},
 )
 
@@ -65,7 +66,6 @@ def init_db():
     if not conn: return
     try:
         cur = conn.cursor()
-        # Table USERS pour le SaaS
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -77,7 +77,6 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ''')
-        # Table SESSIONS pour l'historique
         cur.execute('''CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, user_id INTEGER, candidate_name TEXT, job_title TEXT, company_type TEXT, cv_content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         cur.execute('''CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         conn.commit()
@@ -115,7 +114,6 @@ def load_user(user_id):
 @app.route('/login/google')
 def login_google():
     redirect_uri = url_for('authorize', _external=True)
-    # Fix Render HTTPS issue
     if redirect_uri.startswith('http://') and 'onrender' in redirect_uri:
         redirect_uri = redirect_uri.replace('http://', 'https://')
     return google.authorize_redirect(redirect_uri)
@@ -133,7 +131,6 @@ def authorize():
 
         conn = get_db_connection()
         cur = conn.cursor()
-        # Upsert User (Créer ou Mettre à jour)
         cur.execute("""
             INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s)
             ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name
@@ -159,9 +156,8 @@ def logout():
 @app.route('/api/payment_success', methods=['POST'])
 @login_required
 def payment_success():
-    days = 90 # 3 mois d'accès
+    days = 90
     new_expiry = datetime.datetime.now() + datetime.timedelta(days=days)
-    
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("UPDATE users SET sub_expires = %s WHERE id = %s", (new_expiry, current_user.id))
@@ -197,23 +193,11 @@ def get_prompt(name, job, company, cv, history_len):
     if history_len > 10: stage = "SOFT SKILLS"
     if history_len > 14: stage = "CLOSING"
     cv_context = f"\n=== CANDIDATE CV ===\n{cv[:5000]}\n=== END CV ===\n" if cv else ""
-    
-    return (
-        f"ROLE: You are {COACH_NAME}, an expert recruiter at {company}. Interviewing {name} for {job}.\n"
-        f"CURRENT STAGE: {stage}.\n"
-        f"{cv_context}"
-        f"GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
-        f"RULES:\n"
-        f"1. Ask ONE short question at a time (max 15 words).\n"
-        f"2. Do NOT be repetitive. Follow the flow: Intro -> Exp -> Tech -> Closing.\n"
-        f"3. AUDIO ANALYSIS: The user sends audio transcription. Detect grammar mistakes.\n"
-        f"4. MASTERCLASS LOGIC (CRITICAL): When generating 'better_response_example', YOU MUST USE FACTS FROM THE CV provided above. "
-        f"Do not give generic advice. Rewrite the user's answer to be a 'Perfect Answer' using their specific dates, companies, and achievements found in the CV text.\n"
-        f"JSON OUTPUT FORMAT: {{'coach_response_text': 'Your spoken question', 'transcription_user': 'User text', "
-        f"'score_pronunciation': 0-10, 'feedback_grammar': 'Correction', "
-        f"'better_response_example': 'The MASTERCLASS answer using CV details', "
-        f"'next_step_advice': 'Short tip'}}"
-    )
+    return (f"ROLE: You are {COACH_NAME}, an expert recruiter at {company}. Interviewing {name} for {job}.\n"
+            f"CURRENT STAGE: {stage}.\n{cv_context}"
+            "GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
+            "RULES: Ask ONE short question at a time (max 15 words). Follow flow. Use CV facts.\n"
+            "JSON OUTPUT: {'coach_response_text': '...', 'transcription_user': '...', 'score_pronunciation': 0-10, 'feedback_grammar': '...', 'better_response_example': '...', 'next_step_advice': '...'}")
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')
@@ -224,28 +208,18 @@ def health(): return jsonify({"status": "alive"})
 @app.route('/start_chat', methods=['POST'])
 @login_required
 def start_chat():
-    # Protection Paiement
     if not current_user.is_paid: return jsonify({"error": "Payment required"}), 403
-    
     d = request.json
     sid = d.get('session_id')
     cv_content = d.get('cv_content')
-
     conn = get_db_connection()
     cur = conn.cursor()
-    
-    # 1. Sauvegarde du CV dans le profil User si nouveau
-    if cv_content:
-        cur.execute("UPDATE users SET cv_content = %s WHERE id = %s", (cv_content, current_user.id))
-    else:
-        cv_content = current_user.cv_content
-
-    # 2. Création session
+    if cv_content: cur.execute("UPDATE users SET cv_content = %s WHERE id = %s", (cv_content, current_user.id))
+    else: cv_content = current_user.cv_content
     cur.execute("INSERT INTO sessions (session_id, user_id, candidate_name, job_title, company_type, cv_content) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (session_id) DO NOTHING", 
                (sid, current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), cv_content))
     conn.commit()
     conn.close()
-    
     msg = f"Hello {d.get('candidate_name')}. I'm {COACH_NAME}. Let's start. Briefly introduce yourself."
     return jsonify({"coach_response_text": msg, "audio_base64": generate_tts(msg), "transcription_user": ""})
 
@@ -253,16 +227,13 @@ def start_chat():
 @login_required
 def analyze():
     if not current_user.is_paid: return jsonify({"error": "Payment required"}), 403
-    
     sid = request.form.get('session_id')
     f = request.files.get('audio')
     if not f or not sid: return jsonify({"error": "No audio"}), 400
-
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         f.save(tmp.name)
         webm_path = tmp.name
     mp3_path = webm_path + ".mp3"
-    
     try:
         AudioSegment.from_file(webm_path).export(mp3_path, format="mp3")
         conn = get_db_connection()
@@ -272,28 +243,21 @@ def analyze():
         cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC", (sid,))
         hist_rows = cur.fetchall()
         conn.close()
-
         hist = [{"role": r['role'], "parts": [r['content']]} for r in hist_rows[-10:]]
         sys_prompt = get_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(hist_rows))
-        
         model = genai.GenerativeModel(MODEL_NAME, system_instruction=sys_prompt)
         chat = model.start_chat(history=hist)
-        
         uf = genai.upload_file(mp3_path, mime_type="audio/mp3")
         while uf.state.name == "PROCESSING": time.sleep(0.5); uf = genai.get_file(uf.name)
-        
         resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
-        
         try: data = json.loads(resp.text)
         except: data = json.loads(resp.text.replace('```json', '').replace('```', '').strip())
-        
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s)", (sid, data.get('transcription_user','')))
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'model', %s)", (sid, data.get('coach_response_text','')))
         conn.commit()
         conn.close()
-        
         data['audio_base64'] = generate_tts(data.get('coach_response_text'))
         return jsonify(data)
     except Exception as e: return jsonify({"error": str(e)}), 500
