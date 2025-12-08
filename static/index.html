@@ -31,7 +31,7 @@
     <div id="loader-screen" class="fixed inset-0 bg-slate-800 z-50 flex flex-col items-center justify-center p-6 transition-opacity duration-500">
         <div class="animate-pulse text-white text-center">
             <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p class="text-sm font-semibold tracking-wider uppercase">Checking Access...</p>
+            <p class="text-sm font-semibold tracking-wider uppercase">ROBOT WAKING UP</p>
         </div>
     </div>
 
@@ -221,6 +221,7 @@
                     }
                 }
             } catch (e) { 
+                // En cas d'échec du serveur (Timeout, 500, 503), on affiche le login pour forcer l'utilisateur à se connecter/vérifier
                 console.warn("Auth Check Failed:", e);
                 document.getElementById('login-screen').classList.remove('hidden');
             } finally {
@@ -327,11 +328,10 @@
         // --- 5. AVATAR & NAVIGATION ---
         const vidIdle = document.getElementById('vid-idle');
         const vidTalk = document.getElementById('vid-talk');
-        const imgAvatar = document.getElementById('avatar-img'); // Gardé pour la référence de l'ID
+        const imgAvatar = document.getElementById('avatar-img'); 
 
         function initAvatar() {
             vidIdle.play().then(() => {
-                // imgAvatar.style.display = 'none'; // Cette ligne n'est plus nécessaire car la balise img a été retirée
                 vidIdle.classList.remove('hidden');
             }).catch(e => console.warn("Autoplay blocked", e));
         }
