@@ -29,18 +29,17 @@ app.secret_key = SECRET_KEY
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 CORS(app)
-# Fix vital pour Google Auth sur Render
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# --- CSP HEADERS (Autorise tout le design) ---
+# --- CSP HEADERS (CORRIGÉS POUR PAYPAL SANDBOX) ---
 @app.after_request
 def add_security_headers(response):
     csp = (
         "default-src 'self' data: blob:; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://www.paypal.com https://www.google.com https://www.gstatic.com; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://www.paypal.com https://www.sandbox.paypal.com https://www.google.com https://www.gstatic.com; "
         "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
         "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
-        "connect-src 'self' https://www.paypal.com https://www.google.com https://www.google-analytics.com; "
+        "connect-src 'self' https://www.paypal.com https://www.sandbox.paypal.com https://www.google.com https://www.google-analytics.com; "
         "img-src 'self' data: https:; "
         "media-src 'self' data: blob:;"
     )
@@ -63,7 +62,7 @@ google = oauth.register(
 
 if API_KEY: genai.configure(api_key=API_KEY)
 
-# --- DB & USER LOGIC (LAZY LOADING) ---
+# --- DB & USER LOGIC ---
 DB_INITIALIZED = False
 
 def get_db_connection():
@@ -84,7 +83,6 @@ def init_tables():
         logger.info(">>> DB TABLES READY")
     except Exception as e: logger.error(f"DB INIT ERROR: {e}")
 
-# HOOK VITAL: On initialise la DB seulement si ce n'est PAS un health check
 @app.before_request
 def check_init():
     global DB_INITIALIZED
@@ -149,13 +147,24 @@ def authorize():
         token = google.authorize_access_token()
         resp = google.get('userinfo')
         user_info = resp.json()
-        conn = get_db_connection(); cur = conn.cursor()
+        
+        # DEBUGGING: Si ça plante ici, on veut voir pourquoi
+        conn = get_db_connection()
+        if not conn:
+            return "<h1>ERREUR DB</h1><p>Impossible de se connecter à Neon DB. Vérifiez DATABASE_URL dans Render (pas de guillemets !).</p>"
+            
+        cur = conn.cursor()
         cur.execute("INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s) ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name RETURNING *;", 
                    (user_info['id'], user_info['email'], user_info['name']))
-        u = cur.fetchone(); conn.commit(); conn.close()
+        u = cur.fetchone()
+        conn.commit(); conn.close()
+        
         login_user(User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires']))
         return redirect('/')
-    except Exception as e: logger.error(f"AUTH FAIL: {e}"); return redirect('/')
+    except Exception as e: 
+        logger.error(f"AUTH FAIL: {e}")
+        # AFFICHE L'ERREUR À L'ÉCRAN AU LIEU DE REDIRIGER
+        return f"<h1>LOGIN ERROR</h1><p>Erreur technique : {str(e)}</p>"
 
 @app.route('/logout')
 @login_required
@@ -206,7 +215,6 @@ def analyze():
     tm = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
     try:
         f.save(tw.name); tw.close()
-        # Docker Path
         AudioSegment.converter = "/usr/bin/ffmpeg"
         AudioSegment.from_file(tw.name).export(tm.name, format="mp3")
         tm.close()
