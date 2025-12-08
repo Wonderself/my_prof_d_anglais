@@ -57,7 +57,7 @@ def add_header(response):
 # --- DATABASE ---
 def get_db_connection():
     try:
-        # FIX CRITIQUE: On retire sslmode='require' car il est dans la DATABASE_URL
+        # FIX CRITIQUE: On retire sslmode='require' car il est déjà dans la DATABASE_URL
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     except Exception as e:
         print(f"⚠️ DB ERROR: {e}")
@@ -68,6 +68,7 @@ def init_db():
     if not conn: return
     try:
         cur = conn.cursor()
+        # 1. Création ou vérification des tables
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -81,6 +82,16 @@ def init_db():
         ''')
         cur.execute('''CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, user_id INTEGER, candidate_name TEXT, job_title TEXT, company_type TEXT, cv_content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
         cur.execute('''CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
+        
+        # 2. FIX SCHEMA : AJOUTER LA COLONNE USER_ID SI ELLE MANQUE (Réparation de l'erreur)
+        try:
+            cur.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
+            print("✅ Colonne 'user_id' ajoutée à la table sessions (Correction de l'ancienne erreur).")
+        except (psycopg2.errors.DuplicateColumn, psycopg2.errors.SyntaxError):
+            # C'est normal si la colonne existe déjà ou si la commande plante pour une autre raison
+            conn.rollback()
+            pass
+        
         conn.commit()
         conn.close()
     except Exception as e: print(f"DB INIT ERROR: {e}")
@@ -111,6 +122,10 @@ def load_user(user_id):
     conn.close()
     if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
     return None
+
+# ==========================================
+# DÉFINITION DES ROUTES
+# ==========================================
 
 # --- AUTH ROUTES ---
 @app.route('/login/google')
@@ -221,7 +236,8 @@ def get_prompt(name, job, company, cv, history_len):
         f"CURRENT STAGE: {stage}.\n{cv_context}"
         "GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
         "RULES: Ask ONE short question at a time (max 15 words). Follow flow. Use CV facts.\n"
-        "JSON OUTPUT: {'coach_response_text': '...', 'transcription_user': '...', 'score_pronunciation': 0-10, 'feedback_grammar': '...', 'better_response_example': '...', 'next_step_advice': '...'}")
+        "JSON OUTPUT: {'coach_response_text': '...', 'transcription_user': '...', 'score_pronunciation': 0-10, 'feedback_grammar': '...', 'better_response_example': '...', 'next_step_advice': '...'}"
+    )
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')
