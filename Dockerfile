@@ -1,22 +1,19 @@
-# ON PASSE À PYTHON 3.11 (Plus récent, plus rapide, et supprime les warnings Google)
+# Use the official Python image as a base
 FROM python:3.11-slim
 
-# Installe les outils systèmes (FFmpeg pour l'audio, libpq pour la DB)
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libpq-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (FFmpeg is mandatory for pydub audio processing)
+RUN apt-get update && apt-get install -y ffmpeg
 
+# Set the working directory in the container
 WORKDIR /app
 
+# Copy the requirements file and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy the rest of the application code
 COPY . .
 
-# Render définit la variable PORT automatiquement (souvent 10000)
-ENV PORT=10000
-
-# Lancement PROD avec Gunicorn
-CMD gunicorn --workers 4 --bind 0.0.0.0:$PORT app:app
+# Define the start command for Gunicorn
+# Render defaults to port 10000
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:10000"]
