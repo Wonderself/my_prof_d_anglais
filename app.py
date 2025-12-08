@@ -57,7 +57,8 @@ def add_header(response):
 # --- DATABASE ---
 def get_db_connection():
     try:
-        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode='require')
+        # FIX CRITIQUE: On retire sslmode='require' car il est dans la DATABASE_URL
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     except Exception as e:
         print(f"⚠️ DB ERROR: {e}")
         return None
@@ -110,10 +111,6 @@ def load_user(user_id):
     conn.close()
     if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
     return None
-
-# ==========================================
-# DÉFINITION DES ROUTES (APRÈS app = Flask(...))
-# ==========================================
 
 # --- AUTH ROUTES ---
 @app.route('/login/google')
@@ -170,7 +167,6 @@ def payment_success():
     conn.close()
     return jsonify({"status": "ok", "new_expiry": new_expiry.isoformat()})
 
-# CE BLOC ÉTAIT MAL PLACÉ : IL EST CORRECTEMENT ICI
 @app.route('/api/promo_code', methods=['POST'])
 @login_required
 def promo_code():
@@ -225,8 +221,7 @@ def get_prompt(name, job, company, cv, history_len):
         f"CURRENT STAGE: {stage}.\n{cv_context}"
         "GOAL: Conduct a realistic, structured interview. Be professional but tough.\n"
         "RULES: Ask ONE short question at a time (max 15 words). Follow flow. Use CV facts.\n"
-        "JSON OUTPUT: {'coach_response_text': '...', 'transcription_user': '...', 'score_pronunciation': 0-10, 'feedback_grammar': '...', 'better_response_example': '...', 'next_step_advice': '...'}"
-    )
+        "JSON OUTPUT: {'coach_response_text': '...', 'transcription_user': '...', 'score_pronunciation': 0-10, 'feedback_grammar': '...', 'better_response_example': '...', 'next_step_advice': '...'}")
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')

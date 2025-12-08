@@ -158,9 +158,9 @@
             <div class="flex flex-col md:flex-row items-center gap-1 md:gap-3 mt-4 md:mt-0">
                 <div class="relative w-16 h-16 md:w-14 md:h-14 group shrink-0">
                     <div class="w-full h-full rounded-full overflow-hidden border-2 border-white shadow-md relative bg-slate-200">
-                        <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
+                        <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover"></video>
                         <video id="vid-talk" src="talk.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
-                        <img id="avatar-img" src="coach_static.png" class="w-full h-full object-cover hidden" alt="Sarah">
+                        
                     </div>
                     <div id="audio-indicator" class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center opacity-0 transition-opacity">
                         <i class="fas fa-volume-up text-white text-[8px]"></i>
@@ -327,12 +327,12 @@
         // --- 5. AVATAR & NAVIGATION ---
         const vidIdle = document.getElementById('vid-idle');
         const vidTalk = document.getElementById('vid-talk');
-        const imgAvatar = document.getElementById('avatar-img');
-        const audioIndicator = document.getElementById('audio-indicator');
+        const imgAvatar = document.getElementById('avatar-img'); // Gardé pour la référence de l'ID
 
         function initAvatar() {
             vidIdle.play().then(() => {
-                imgAvatar.style.display = 'none'; vidIdle.classList.remove('hidden');
+                // imgAvatar.style.display = 'none'; // Cette ligne n'est plus nécessaire car la balise img a été retirée
+                vidIdle.classList.remove('hidden');
             }).catch(e => console.warn("Autoplay blocked", e));
         }
         
