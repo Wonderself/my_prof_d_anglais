@@ -13,18 +13,18 @@ from urllib.parse import quote
 from pypdf import PdfReader
 from docx import Document
 
-# --- LOGGING ---
-logging.basicConfig(level=logging.INFO)
+# --- LOGGING EXTRÊME (Pour voir où ça coince) ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- CONFIG ---
+logger.info(">>> STARTING APP CONFIGURATION")
 API_KEY = os.getenv("GOOGLE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key")
 
-# MODIF 1: Configuration explicite du dossier static
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = SECRET_KEY
 app.config['PREFERRED_URL_SCHEME'] = 'https'
@@ -32,7 +32,7 @@ app.config['PREFERRED_URL_SCHEME'] = 'https'
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# MODIF 2: CSP Headers CORRIGÉS (Autorise Tailwind et FontAwesome)
+# CSP HEADERS
 @app.after_request
 def add_security_headers(response):
     csp = (
@@ -63,12 +63,19 @@ google = oauth.register(
 
 if API_KEY: genai.configure(api_key=API_KEY)
 
-# --- DB & MODEL ---
-def get_db_connection():
-    try: return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    except Exception as e: logger.error(f"DB Error: {e}"); return None
+# --- DB LOGIC (LAZY LOADING) ---
+DB_INITIALIZED = False
 
-def init_db():
+def get_db_connection():
+    try: 
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        return conn
+    except Exception as e: 
+        logger.error(f"DB CONNECTION FAILED: {e}")
+        return None
+
+def init_db_logic():
+    """Crée les tables si elles n'existent pas."""
     conn = get_db_connection()
     if not conn: return
     try:
@@ -79,9 +86,24 @@ def init_db():
         try: cur.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
         except: conn.rollback()
         conn.commit(); conn.close()
-    except Exception as e: logger.error(f"DB Init Error: {e}")
+        logger.info(">>> DATABASE TABLES READY")
+    except Exception as e: 
+        logger.error(f">>> DB INIT ERROR: {e}")
 
-init_db()
+# FIX CRITIQUE: On n'appelle plus init_db() ici directement !
+# On utilise un "hook" pour le faire à la première requête.
+
+@app.before_request
+def initialize_on_demand():
+    global DB_INITIALIZED
+    # On ne touche pas à la DB si c'est le Health Check ! (Vital pour le déploiement)
+    if request.endpoint == 'health':
+        return
+    
+    if not DB_INITIALIZED:
+        logger.info(">>> First request detected, waking up DB...")
+        init_db_logic()
+        DB_INITIALIZED = True
 
 class User(UserMixin):
     def __init__(self, id, email, name, cv_content, sub_expires):
@@ -93,10 +115,13 @@ class User(UserMixin):
 def load_user(user_id):
     conn = get_db_connection(); 
     if not conn: return None
-    cur = conn.cursor(); cur.execute("SELECT * FROM users WHERE id = %s", (user_id,)); u = cur.fetchone(); conn.close()
-    if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
+    try:
+        cur = conn.cursor(); cur.execute("SELECT * FROM users WHERE id = %s", (user_id,)); u = cur.fetchone(); conn.close()
+        if u: return User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires'])
+    except: pass
     return None
 
+# --- AI & TTS ---
 def generate_tts(text):
     try:
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:900])}"
@@ -119,13 +144,14 @@ def get_ai_prompt(name, job, company, cv, history_len):
 @app.route('/')
 def index(): return app.send_static_file('index.html')
 
-# MODIF 3: Route spéciale pour servir les fichiers à la racine si besoin (corrige les 404)
 @app.route('/<path:filename>')
 def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
 @app.route('/health')
-def health(): return jsonify({"status": "alive"})
+def health(): 
+    # Cette route doit être ULTRA rapide et ne rien faire de compliqué
+    return jsonify({"status": "alive", "timestamp": str(datetime.datetime.now())})
 
 @app.route('/auth/login')
 def login(): return google.authorize_redirect(url_for('authorize', _external=True))
@@ -142,7 +168,9 @@ def authorize():
         u = cur.fetchone(); conn.commit(); conn.close()
         login_user(User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires']))
         return redirect('/')
-    except: return redirect('/')
+    except Exception as e:
+        logger.error(f"AUTH ERROR: {e}")
+        return redirect('/')
 
 @app.route('/logout')
 @login_required
@@ -190,39 +218,45 @@ def analyze():
     f = request.files.get('audio')
     if not f: return jsonify({"error": "No audio"}), 400
     
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tw, tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tm:
-        f.save(tw.name); tw.close(); tm.close()
-        try:
-            AudioSegment.converter = "/usr/bin/ffmpeg"
-            AudioSegment.from_file(tw.name).export(tm.name, format="mp3")
-            
-            conn = get_db_connection(); cur = conn.cursor()
-            cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
-            sess = cur.fetchone()
-            cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC LIMIT 10", (sid,))
-            hist = [{"role": r['role'], "parts": [r['content']]} for r in cur.fetchall()]
-            conn.close()
-            
-            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(hist)))
-            chat = model.start_chat(history=hist)
-            
-            uf = genai.upload_file(tm.name, mime_type="audio/mp3")
-            while uf.state.name == "PROCESSING": time.sleep(1); uf = genai.get_file(uf.name)
-            
-            resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
-            data = json.loads(resp.text.replace('```json','').replace('```','').strip())
-            
-            conn = get_db_connection(); cur = conn.cursor()
-            cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
-                       (sid, data.get('transcription_user'), sid, data.get('coach_response_text')))
-            conn.commit(); conn.close()
-            
-            data['audio_base64'] = generate_tts(data.get('coach_response_text'))
-            return jsonify(data)
-        except Exception as e: return jsonify({"error": str(e)}), 500
-        finally: 
-            if os.path.exists(tw.name): os.remove(tw.name)
-            if os.path.exists(tm.name): os.remove(tm.name)
+    tw = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
+    tm = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    try:
+        f.save(tw.name); tw.close()
+        
+        # Docker Check
+        AudioSegment.converter = "/usr/bin/ffmpeg"
+        AudioSegment.from_file(tw.name).export(tm.name, format="mp3")
+        tm.close() # Close before upload
+        
+        conn = get_db_connection(); cur = conn.cursor()
+        cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
+        sess = cur.fetchone()
+        cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC LIMIT 10", (sid,))
+        hist = [{"role": r['role'], "parts": [r['content']]} for r in cur.fetchall()]
+        conn.close()
+        
+        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(hist)))
+        chat = model.start_chat(history=hist)
+        
+        uf = genai.upload_file(tm.name, mime_type="audio/mp3")
+        while uf.state.name == "PROCESSING": time.sleep(1); uf = genai.get_file(uf.name)
+        
+        resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
+        data = json.loads(resp.text.replace('```json','').replace('```','').strip())
+        
+        conn = get_db_connection(); cur = conn.cursor()
+        cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
+                   (sid, data.get('transcription_user'), sid, data.get('coach_response_text')))
+        conn.commit(); conn.close()
+        
+        data['audio_base64'] = generate_tts(data.get('coach_response_text'))
+        return jsonify(data)
+    except Exception as e: 
+        logger.error(f"ANALYZE ERROR: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally: 
+        if os.path.exists(tw.name): os.remove(tw.name)
+        if os.path.exists(tm.name): os.remove(tm.name)
 
 # --- PROMOS ---
 @app.route('/api/payment_success', methods=['POST'])
@@ -241,4 +275,5 @@ def promo():
         conn.commit(); conn.close(); return jsonify({"status": "free_access_granted", "message": "VIP Access"})
     return jsonify({"status": "invalid", "message": "Invalid Code"}), 400
 
-if __name__ == '__main__': app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+if __name__ == '__main__': 
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
