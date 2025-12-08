@@ -6,14 +6,11 @@
     <title>JOB ITV SIMULATOR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#007AFF">
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
-
     <script src="https://www.paypal.com/sdk/js?client-id=AVaXhjiQjRN4YKxQnkh1jBWfgWDNjA23YLd3SAUGPBDlDyjOeswmF1D0n0LnyniKbLa_HkZGB9vXAHuv&currency=EUR"></script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         :root { --primary: #007AFF; --bg: #F2F2F7; }
@@ -39,10 +36,8 @@
         <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-100 mb-6 shadow-xl bg-slate-200 relative">
              <video src="idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
         </div>
-        
         <h1 class="text-2xl font-bold mb-2 tracking-tight text-center">JOB ITV SIMULATOR</h1>
         <p class="text-slate-500 mb-8 text-center max-w-xs text-sm">Master your English interviews with AI.</p>
-        
         <a href="/login/google" class="flex items-center gap-3 bg-white border border-slate-300 text-slate-700 px-6 py-4 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all w-full max-w-xs justify-center group">
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-6 h-6 group-hover:scale-110 transition-transform">
             Continue with Google
@@ -55,43 +50,34 @@
                 <h1 class="text-3xl font-bold mb-2 text-slate-900">Unlock Your Career Potential</h1>
                 <p class="text-lg text-slate-600">The Ultimate AI Interview Coach</p>
             </div>
-
             <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8 shadow-sm">
                 <p class="font-semibold text-slate-800 mb-4">Why choose JOB ITV SIMULATOR?</p>
                 <ul class="space-y-3 text-sm text-slate-600">
                     <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **Personalized Masterclass:** Our V6 model analyzes your uploaded CV, challenging your experience with **specific questions**.
+                        **Personalized Masterclass:** Our V6 model analyzes your CV.
                     </li>
                     <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **Real-Time Language Correction:** Get instant feedback on your grammar and pronunciation.
-                    </li>
-                    <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **AI-Driven Benchmarking:** See the perfect "Masterclass" response for every question.
+                        **Real-Time Language Correction:** Instant grammar feedback.
                     </li>
                 </ul>
             </div>
-            
             <div class="text-center mb-6">
                 <p class="text-sm text-slate-500 mb-1">Total Value: <span class="line-through">€30</span></p>
                 <p class="text-4xl font-bold text-slate-900">€9.99</p>
                 <p class="text-xs text-slate-500 mt-1">Unlock 3 months of unlimited training.</p>
             </div>
-
             <div class="flex gap-2 w-full max-w-sm mx-auto mb-6">
                 <input id="promo-code-input" type="text" placeholder="ENTER PROMO CODE" class="flex-1 p-3 border border-slate-300 rounded-xl font-semibold uppercase outline-none focus:ring-2 ring-blue-500 text-sm">
                 <button onclick="applyPromoCode()" class="bg-blue-600 text-white p-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shrink-0" id="apply-promo-btn">APPLY</button>
             </div>
             <p id="promo-message" class="text-center text-xs font-semibold mb-4 h-4"></p>
-
             <div id="paypal-button-container" class="w-full max-w-xs mx-auto min-h-[150px]"></div>
-            
-            <button onclick="window.location.href='/logout'" class="mt-6 text-xs text-slate-400 underline hover:text-slate-600 w-full text-center">Logout (Wrong account?)</button>
+            <button onclick="window.location.href='/logout'" class="mt-6 text-xs text-slate-400 underline hover:text-slate-600 w-full text-center">Logout</button>
         </div>
     </div>
 
     <div id="setup-screen" class="fixed inset-0 bg-white z-30 flex flex-col hidden transition-transform duration-500 ease-in-out">
         <div id="setup-screen-inner" class="flex-1 flex flex-col justify-center p-4 md:p-6 w-full max-w-md mx-auto md:max-w-3xl">
-            
             <div class="mb-4 md:mb-6 flex flex-col md:flex-row items-center justify-center md:justify-center md:gap-6 shrink-0">
                 <div class="w-24 h-24 md:w-28 md:h-28 rounded-full shadow-lg border-4 border-white overflow-hidden relative bg-slate-100 shrink-0">
                     <video src="idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
@@ -102,9 +88,7 @@
                         <p class="text-blue-600 font-bold tracking-widest text-[10px] md:text-xs uppercase">PREMIUM MEMBER</p>
                         <i class="fas fa-check-circle text-blue-500 text-xs"></i>
                     </div>
-                    <p class="hidden md:block text-slate-400 text-xs mt-1 max-w-sm leading-tight">
-                        Configure your role, upload your CV and start the simulation.
-                    </p>
+                    <p class="hidden md:block text-slate-400 text-xs mt-1 max-w-sm leading-tight">Configure your role, upload your CV and start the simulation.</p>
                 </div>
             </div>
             
@@ -127,7 +111,7 @@
 
                 <div>
                     <label for="inp-cv" class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1 flex items-center justify-between">
-                        MY RESUME
+                        MY RESUME (PDF/DOCX/TXT)
                         <span id="cv-status" class="text-[9px] text-slate-400">No file</span>
                     </label>
                     <input id="inp-cv" type="file" accept=".txt,.pdf,.doc,.docx" class="hidden" onchange="readCVFile()">
@@ -187,244 +171,135 @@
         const API_URL = ""; 
         let sessionId = localStorage.getItem('coach_sess') || 'sess_' + Date.now();
         localStorage.setItem('coach_sess', sessionId);
-        
-        let mediaRecorder;
-        let audioChunks = [];
-        let userCV = "";
+        let mediaRecorder; let audioChunks = []; let userCV = "";
 
-        // --- 1. AUTH & PAYMENT CHECK ---
         async function checkUser() {
             const loader = document.getElementById('loader-screen');
             try {
                 const res = await fetch('/api/me');
-                if (!res.ok) throw new Error("Server Error or Not Logged In");
+                if (!res.ok) throw new Error("Server Error");
                 const data = await res.json();
-                
-                if (!data.logged_in) {
-                    document.getElementById('login-screen').classList.remove('hidden');
-                } else if (!data.is_paid) {
-                    document.getElementById('payment-screen').classList.remove('hidden');
-                    initPayPal();
-                } else {
+                if (!data.logged_in) document.getElementById('login-screen').classList.remove('hidden');
+                else if (!data.is_paid) { document.getElementById('payment-screen').classList.remove('hidden'); initPayPal(); }
+                else {
                     document.getElementById('setup-screen').classList.remove('hidden');
                     if (data.name) document.getElementById('inp-name').value = data.name;
                     if (data.saved_cv) {
-                        userCV = data.saved_cv;
-                        document.getElementById('cv-content').value = userCV;
+                        userCV = data.saved_cv; document.getElementById('cv-content').value = userCV;
                         document.getElementById('cv-status').innerText = "Loaded from profile ✅";
                         document.getElementById('cv-status').classList.add('text-green-600');
                         document.getElementById('btn-cv-text').innerText = "Update Resume";
                     }
                 }
-            } catch (e) { 
-                console.warn("Auth Check Failed:", e);
-                document.getElementById('login-screen').classList.remove('hidden');
-            } finally {
-                loader.classList.add('opacity-0');
-                setTimeout(() => loader.style.display = 'none', 500);
-            }
+            } catch (e) { console.warn("Check Failed", e); document.getElementById('login-screen').classList.remove('hidden'); } 
+            finally { loader.classList.add('opacity-0'); setTimeout(() => loader.style.display = 'none', 500); }
         }
-        
         window.onload = checkUser;
 
-        // --- 2. PAYPAL LOGIC ---
         function initPayPal() {
-            if (!window.paypal) {
-                setTimeout(initPayPal, 500); 
-                return;
-            }
+            if (!window.paypal) { setTimeout(initPayPal, 500); return; }
             paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({ purchase_units: [{ amount: { value: '9.99' } }] });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        document.getElementById('payment-screen').innerHTML = '<div class="text-center"><h2 class="text-2xl font-bold text-green-600">Payment Success!</h2><p>Redirecting...</p></div>';
-                        fetch('/api/payment_success', { method: 'POST' }).then(() => location.reload());
-                    });
-                }
+                createOrder: (d, a) => a.order.create({ purchase_units: [{ amount: { value: '9.99' } }] }),
+                onApprove: (d, a) => a.order.capture().then(() => {
+                    fetch('/api/payment_success', { method: 'POST' }).then(() => location.reload());
+                })
             }).render('#paypal-button-container');
         }
 
-        // --- 3. PROMO CODE LOGIC ---
         async function applyPromoCode() {
-            const input = document.getElementById('promo-code-input');
-            const btn = document.getElementById('apply-promo-btn');
+            const code = document.getElementById('promo-code-input').value.toUpperCase().trim();
             const msg = document.getElementById('promo-message');
-            const code = input.value.toUpperCase().trim();
-
-            if (!code) { msg.style.color = 'red'; msg.innerText = "Please enter a code."; return; }
-
-            btn.disabled = true;
-            msg.innerText = "Verifying...";
-            msg.style.color = 'gray';
-
-            if (code === "FIFTYFIFTY") {
-                msg.style.color = 'orange';
-                msg.innerText = "Code applied! Price is now €4.99 (Contact support for custom PayPal link).";
-                btn.disabled = false;
-                return;
-            }
-
+            if (!code) return;
             try {
                 const res = await fetch('/api/promo_code', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ code: code })
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code: code })
                 });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.status === 'free_access_granted') {
-                        msg.style.color = 'green';
-                        msg.innerText = data.message;
-                        setTimeout(() => location.reload(), 2000); 
-                    } else {
-                         msg.style.color = 'orange';
-                         msg.innerText = data.message;
-                    }
-                } else {
-                    const errorData = await res.json();
-                    msg.style.color = 'red';
-                    msg.innerText = errorData.message || "Code invalide.";
-                }
-            } catch (e) {
-                msg.style.color = 'red';
-                msg.innerText = "Server error during verification.";
-            } finally {
-                btn.disabled = false;
-            }
+                const data = await res.json();
+                msg.innerText = data.message;
+                msg.style.color = data.status === 'free_access_granted' ? 'green' : (data.status === 'discount_applied' ? 'orange' : 'red');
+                if (data.status === 'free_access_granted') setTimeout(() => location.reload(), 2000);
+            } catch (e) { msg.innerText = "Error"; msg.style.color = "red"; }
         }
 
-        // --- 4. CV HANDLING & CORE ---
-        function readCVFile() {
-            const fileInput = document.getElementById('inp-cv');
-            const file = fileInput.files[0];
+        async function readCVFile() {
+            const file = document.getElementById('inp-cv').files[0];
             const status = document.getElementById('cv-status');
-            const cvContent = document.getElementById('cv-content');
-            
             if (!file) return;
-            if (file.size > 1024 * 1024 * 1) { 
-                status.innerText = "Max 1MB"; status.classList.add('text-red-500'); return;
-            }
+            status.innerText = "Processing..."; status.className = "text-[9px] text-orange-500";
             
-            status.innerText = `Reading...`;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                cvContent.value = e.target.result;
-                status.innerText = `Ready to upload`;
-                status.classList.remove('text-red-500');
-                status.classList.add('text-blue-600');
-            };
-            reader.readAsText(file);
+            const fd = new FormData(); fd.append('file', file);
+            try {
+                const res = await fetch('/upload_cv', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                document.getElementById('cv-content').value = data.text;
+                status.innerText = "Ready to upload ✅"; status.className = "text-[9px] text-green-600";
+            } catch (e) {
+                status.innerText = "Error reading file"; status.className = "text-[9px] text-red-500";
+            }
         }
 
-        // --- AVATAR ---
+        // --- AVATAR & CHAT ---
         const vidIdle = document.getElementById('vid-idle');
         const vidTalk = document.getElementById('vid-talk');
         const audioIndicator = document.getElementById('audio-indicator');
 
-        function initAvatar() {
-            vidIdle.play().then(() => {
-                vidIdle.classList.remove('hidden');
-            }).catch(e => console.warn("Autoplay blocked", e));
-        }
-        
+        function initAvatar() { vidIdle.play().then(() => vidIdle.classList.remove('hidden')).catch(console.warn); }
         function setAvatarState(isTalking) {
             audioIndicator.style.opacity = isTalking ? '1' : '0';
-            if (isTalking) {
-                vidIdle.classList.add('hidden'); vidTalk.classList.remove('hidden'); vidTalk.play();
-            } else {
-                vidTalk.classList.add('hidden'); vidIdle.classList.remove('hidden'); vidIdle.play();
-            }
+            if (isTalking) { vidIdle.classList.add('hidden'); vidTalk.classList.remove('hidden'); vidTalk.play(); }
+            else { vidTalk.classList.add('hidden'); vidIdle.classList.remove('hidden'); vidIdle.play(); }
         }
+        function returnToSetup() { if (confirm("Stop interview?")) location.reload(); }
 
-        function returnToSetup() {
-            if (confirm("Stop interview?")) {
-                location.reload(); 
-            }
-        }
-
-        // --- CHAT LOGIC ---
-        function playAudio(base64Audio) {
-            if (!base64Audio) return;
-            const audio = new Audio("data:audio/mp3;base64," + base64Audio);
+        function playAudio(b64) {
+            if (!b64) return;
+            const audio = new Audio("data:audio/mp3;base64," + b64);
             audio.onplay = () => setAvatarState(true);
             audio.onended = () => setAvatarState(false);
-            audio.onerror = () => setAvatarState(false);
             audio.play().catch(console.warn);
         }
 
         function addMsg(role, text, feedback=null) {
             const box = document.getElementById('chat-box');
             const isCoach = role === 'coach';
-            const div = document.createElement('div');
-            div.className = `bubble flex flex-col ${isCoach ? 'items-start' : 'items-end'} mb-4`;
-            
-            let html = `
-                <div class="px-5 py-3 rounded-2xl max-w-[90%] text-sm leading-relaxed shadow-sm 
-                            ${isCoach ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200' : 'bg-blue-600 text-white rounded-tr-none'}">
-                    ${text}
-                </div>`;
-
+            let html = `<div class="bubble flex flex-col ${isCoach ? 'items-start' : 'items-end'} mb-4">
+                <div class="px-5 py-3 rounded-2xl max-w-[90%] text-sm leading-relaxed shadow-sm ${isCoach ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200' : 'bg-blue-600 text-white rounded-tr-none'}">${text}</div>`;
             if (feedback) {
-                const scoreColor = feedback.score >= 8 ? 'bg-green-500' : (feedback.score >= 5 ? 'bg-orange-500' : 'bg-red-500');
-                html += `
-                <div class="mt-2 ml-1 w-[95%] bg-white p-4 rounded-xl border border-slate-200 shadow-md space-y-3 relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full ${scoreColor}"></div>
-                    <div class="flex justify-between items-end border-b border-slate-100 pb-2">
-                        <div>
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">Score</span>
-                            <span class="text-xl font-bold text-slate-800">${feedback.score}<span class="text-xs text-slate-400">/10</span></span>
-                        </div>
-                    </div>
-                    <div class="space-y-2 text-xs">
-                        ${feedback.grammar && feedback.grammar.length > 2 ? `<div class="text-slate-600"><strong class="text-red-500 block text-[9px] uppercase">Correction</strong>${feedback.grammar}</div>` : ''}
-                        <div><strong class="text-blue-500 block text-[9px] uppercase">Tip</strong>${feedback.tip}</div>
-                    </div>
-                    <div class="pt-2 mt-1 border-t border-slate-100">
-                        <div class="relative group cursor-pointer" onclick="this.querySelector('.blur-reveal').classList.add('revealed');">
-                            <div class="blur-reveal p-2 bg-slate-50 rounded text-slate-800 italic text-xs border border-slate-100">"${feedback.better}"</div>
-                        </div>
-                    </div>
-                </div>`;
-            }
-
-            div.innerHTML = html;
-            box.appendChild(div);
-            setTimeout(() => { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); }, 50);
+                const color = feedback.score >= 8 ? 'bg-green-500' : (feedback.score >= 5 ? 'bg-orange-500' : 'bg-red-500');
+                html += `<div class="mt-2 ml-1 w-[95%] bg-white p-4 rounded-xl border border-slate-200 shadow-md relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1 h-full ${color}"></div>
+                    <div class="text-xs space-y-2">
+                        <div class="flex justify-between border-b border-slate-100 pb-2"><span class="font-bold text-slate-400">SCORE</span><span class="font-bold text-slate-800 text-lg">${feedback.score}<span class="text-xs text-slate-400">/10</span></span></div>
+                        ${feedback.grammar ? `<div class="text-slate-600"><strong class="text-red-500 block uppercase text-[9px]">Correction</strong>${feedback.grammar}</div>` : ''}
+                        <div><strong class="text-blue-500 block uppercase text-[9px]">Tip</strong>${feedback.tip}</div>
+                        <div class="pt-2 border-t border-slate-100 italic text-slate-500 text-[10px] blur-reveal" onclick="this.classList.add('revealed')">"${feedback.better}"</div>
+                    </div></div></div>`;
+            } else { html += `</div>`; }
+            box.insertAdjacentHTML('beforeend', html);
+            setTimeout(() => box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }), 50);
         }
 
         async function startSession() {
             const name = document.getElementById('inp-name').value;
             const job = document.getElementById('inp-job').value;
             const company = document.getElementById('inp-company').value;
-            const cvContent = document.getElementById('cv-content').value;
+            const cv = document.getElementById('cv-content').value;
+            
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('chat-header').classList.remove('hidden');
+            document.getElementById('chat-box').classList.remove('hidden');
+            document.getElementById('chat-footer').classList.remove('hidden');
+            initAvatar();
 
-            document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
-            setTimeout(() => {
-                 document.getElementById('setup-screen').classList.add('hidden');
-                 document.getElementById('chat-header').classList.remove('hidden');
-                 document.getElementById('chat-box').classList.remove('hidden');
-                 document.getElementById('chat-footer').classList.remove('hidden');
-                 initAvatar();
-            }, 500);
-
-            try {
-                const res = await fetch(`${API_URL}/start_chat`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        session_id: sessionId, candidate_name: name, job_title: job, 
-                        company_type: company, cv_content: cvContent 
-                    })
-                });
-                const data = await res.json();
-                if(data.error) { alert(data.error); location.reload(); return; }
-                addMsg('coach', data.coach_response_text);
-                if (data.audio_base64) playAudio(data.audio_base64);
-                initMic();
-            } catch (e) { alert("Server Error"); location.reload(); }
+            const res = await fetch(`${API_URL}/start_chat`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ session_id: sessionId, candidate_name: name, job_title: job, company_type: company, cv_content: cv })
+            });
+            const data = await res.json();
+            addMsg('coach', data.coach_response_text);
+            if (data.audio_base64) playAudio(data.audio_base64);
+            initMic();
         }
 
         async function initMic() {
@@ -433,60 +308,29 @@
                 mediaRecorder = new MediaRecorder(stream);
                 mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = sendAudio;
-                
-                const btn = document.getElementById('mic-btn');
-                btn.disabled = false;
-                
-                const startRec = (e) => {
-                    e.preventDefault(); audioChunks = []; mediaRecorder.start();
-                    btn.classList.add('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.remove('bg-blue-600', 'text-2xl');
-                    document.getElementById('status-txt').innerText = "Listening...";
-                    document.getElementById('status-txt').classList.add('text-red-500');
-                };
-                const stopRec = (e) => {
-                    e.preventDefault(); if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-                    btn.classList.remove('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.add('bg-blue-600', 'text-2xl');
-                    document.getElementById('status-txt').classList.remove('text-red-500');
-                };
-                btn.addEventListener('mousedown', startRec); btn.addEventListener('touchstart', startRec);
-                btn.addEventListener('mouseup', stopRec); btn.addEventListener('touchend', stopRec);
-            } catch (e) { alert("Mic required"); }
+                const btn = document.getElementById('mic-btn'); btn.disabled = false;
+                const start = (e) => { e.preventDefault(); audioChunks=[]; mediaRecorder.start(); btn.classList.add('scale-110','bg-red-500'); document.getElementById('status-txt').innerText="Listening..."; };
+                const stop = (e) => { e.preventDefault(); if(mediaRecorder.state==='recording') mediaRecorder.stop(); btn.classList.remove('scale-110','bg-red-500'); document.getElementById('status-txt').innerText="Processing..."; };
+                btn.onmousedown = start; btn.onmouseup = stop; btn.ontouchstart = start; btn.ontouchend = stop;
+            } catch (e) { alert("Microphone required"); }
         }
 
         async function sendAudio() {
             await new Promise(r => setTimeout(r, 200));
             if (audioChunks.length === 0) return;
-            const btnIcon = document.getElementById('btn-icon');
-            const loader = document.getElementById('btn-loader');
-            const status = document.getElementById('status-txt');
-            btnIcon.classList.add('hidden'); loader.classList.remove('hidden');
-            status.innerText = "Recruiter AI is thinking...";
-
             const blob = new Blob(audioChunks, { type: 'audio/webm' });
-            const fd = new FormData();
-            fd.append('audio', blob); fd.append('session_id', sessionId);
-
+            const fd = new FormData(); fd.append('audio', blob); fd.append('session_id', sessionId);
+            
             try {
                 const res = await fetch(`${API_URL}/analyze`, { method: 'POST', body: fd });
                 const data = await res.json();
-                if (data.error) throw new Error(data.error);
                 addMsg('user', data.transcription_user);
                 setTimeout(() => {
-                    addMsg('coach', data.coach_response_text, {
-                        score: data.score_pronunciation, grammar: data.feedback_grammar,
-                        tip: data.next_step_advice, better: data.better_response_example
-                    });
+                    addMsg('coach', data.coach_response_text, { score: data.score_pronunciation, grammar: data.feedback_grammar, tip: data.next_step_advice, better: data.better_response_example });
                     if (data.audio_base64) playAudio(data.audio_base64);
                 }, 600);
-            } catch (e) { status.innerText = "Error"; addMsg('coach', `⚠️ Error`); } 
-            finally {
-                btnIcon.classList.remove('hidden'); loader.classList.add('hidden');
-                status.innerText = "Hold to Answer";
-            }
-        }
-        
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
+            } catch (e) { addMsg('coach', "⚠️ Connection Error. Please try again."); }
+            finally { document.getElementById('status-txt').innerText = "Hold to Answer"; }
         }
     </script>
 </body>
