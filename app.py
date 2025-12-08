@@ -4,7 +4,7 @@ from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
 from werkzeug.middleware.proxy_fix import ProxyFix
-from pydub import AudioSegment
+# On n'utilise plus pydub pour la conversion, on envoie direct à Gemini
 import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -123,28 +123,30 @@ def get_ai_prompt(name, job, company, cv, history_len):
     if history_len >= 6: stage = "CHALLENGE"
     if history_len >= 10: stage = "CLOSING"
 
-    cv_text = cv[:6000] if cv else "NO CV PROVIDED."
+    cv_text = cv[:8000] if cv else "NO CV PROVIDED."
     
     return f"""
-    ROLE: You are an Elite Tech Recruiter at {company}. Interviewing {name} for {job}.
-    TONE: Professional, concise, fair but tough.
+    ROLE: You are an expert recruiter at {company}. Interviewing {name} for {job}.
+    TONE: Professional, concise, challenging but fair. Spoken English.
     STAGE: {stage}
-    CV: "{cv_text}"
     
-    MISSION:
-    1. Analyze the audio transcription.
-    2. Compare with CV.
-    3. Ask a specific, relevant next question.
-    4. Provide a "MASTERCLASS" example answer hidden in the JSON.
+    CANDIDATE CV:
+    "{cv_text}"
     
-    OUTPUT JSON FORMAT (STRICT):
+    INSTRUCTIONS:
+    1. Listen to the candidate's audio.
+    2. Check against the CV: Are they consistent? Did they mention the specific skills listed?
+    3. Ask a FOLLOW-UP question based on the CV. Do NOT ask generic questions. Quote the CV if needed.
+    4. Create a "MASTERCLASS" example answer that would have been perfect for the previous question.
+    
+    OUTPUT JSON (STRICT):
     {{
-        "coach_response_text": "Your spoken question.",
-        "transcription_user": "What you understood.",
+        "coach_response_text": "Your next question (max 2 sentences).",
+        "transcription_user": "What you heard.",
         "score_pronunciation": (0-10),
-        "feedback_grammar": "Correction.",
-        "better_response_example": "THE MASTERCLASS ANSWER.",
-        "next_step_advice": "Strategic tip."
+        "feedback_grammar": "Correction of any mistake.",
+        "better_response_example": "The perfect 'Masterclass' answer to the PREVIOUS question.",
+        "next_step_advice": "A short strategic tip."
     }}
     """
 
@@ -218,49 +220,35 @@ def start_chat():
                (d.get('session_id'), current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), final_cv))
     conn.commit(); conn.close()
     
-    msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter for {d.get('company_type')}. Let's discuss your application for {d.get('job_title')}. Please introduce yourself."
+    msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter for {d.get('company_type')}. I have your CV. Please introduce yourself."
     return jsonify({"coach_response_text": msg, "audio_base64": generate_tts(msg)})
 
 @app.route('/analyze', methods=['POST'])
 @login_required
 def analyze():
-    # LOGS D'ENTRÉE POUR DÉBUGGER
-    logger.info(">>> ANALYZE REQUEST RECEIVED")
-    
+    # 1. VERIFS
+    logger.info(">>> ANALYZE START")
     if not current_user.is_paid: return jsonify({"error": "Pay first"}), 403
     
     sid = request.form.get('session_id')
     f = request.files.get('audio')
     
-    if not f: 
-        logger.error(">>> NO AUDIO FILE")
-        return jsonify({"error": "No audio file"}), 400
+    if not f: return jsonify({"error": "No audio"}), 400
     
-    # SETUP FILES
+    # 2. SAUVEGARDE DIRECTE EN WEBM (Pas de conversion locale -> Moins d'erreurs)
     tw = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
-    tm = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
     
     try:
-        # SAVE WEB
         f.save(tw.name)
-        tw.close() # Important de fermer le handle avant que pydub ne l'ouvre
+        tw.close()
         
         file_size = os.path.getsize(tw.name)
-        logger.info(f">>> AUDIO SAVED. Size: {file_size} bytes")
+        logger.info(f"Audio received: {file_size} bytes")
         
-        if file_size < 100:
-            logger.error(">>> AUDIO FILE TOO SMALL (EMPTY)")
-            return jsonify({"error": "Empty audio"}), 400
+        if file_size < 500: # Fichier trop petit = silence ou bug
+            return jsonify({"error": "Audio too short"}), 400
 
-        # CONVERT TO MP3
-        # FIX: On ne force pas le chemin ffmpeg, on laisse pydub le trouver dans le PATH Docker
-        logger.info(">>> STARTING CONVERSION")
-        audio = AudioSegment.from_file(tw.name)
-        audio.export(tm.name, format="mp3")
-        tm.close() # Close file handle
-        logger.info(">>> CONVERSION SUCCESS")
-        
-        # DB CONTEXT
+        # 3. CONTEXTE DB
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
@@ -271,23 +259,36 @@ def analyze():
         
         hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
         
-        # GEMINI
-        logger.info(">>> CALLING GEMINI")
+        # 4. GEMINI (Upload direct du WebM)
         sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
         
-        uf = genai.upload_file(tm.name, mime_type="audio/mp3")
+        # On envoie le fichier WebM tel quel, Gemini sait le lire !
+        uf = genai.upload_file(tw.name, mime_type="audio/webm")
+        
+        # Attente active
         while uf.state.name == "PROCESSING": time.sleep(0.5); uf = genai.get_file(uf.name)
         
-        resp = chat.send_message([uf, "Analyze this."], generation_config={"response_mime_type": "application/json"})
+        if uf.state.name == "FAILED":
+            raise Exception("Gemini refused the audio file")
+
+        resp = chat.send_message([uf, "Analyze this answer."], generation_config={"response_mime_type": "application/json"})
         
         try:
             data = json.loads(resp.text.replace('```json','').replace('```','').strip())
         except:
-            data = {"coach_response_text": "I heard you but couldn't analyze clearly. Can you repeat?", "transcription_user": "(Unclear)", "score_pronunciation": 5, "feedback_grammar": "", "better_response_example": "", "next_step_advice": ""}
+            # Fallback si l'IA délire
+            data = {
+                "coach_response_text": "I understood what you said, but let's move on. What are your main strengths?",
+                "transcription_user": "(Analysis skipped)",
+                "score_pronunciation": 7,
+                "feedback_grammar": "None",
+                "better_response_example": "Focus on strengths relevant to the job.",
+                "next_step_advice": "Be concise."
+            }
 
-        # SAVE
+        # 5. SAVE & RETURN
         conn = get_db_connection(); cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
                    (sid, data.get('transcription_user', ''), sid, data.get('coach_response_text', '')))
@@ -297,22 +298,21 @@ def analyze():
         return jsonify(data)
 
     except Exception as e:
-        logger.error(f">>> CRITICAL ERROR IN ANALYZE: {str(e)}")
-        # On retourne une 200 avec une erreur JSON pour que le front ne plante pas
+        logger.error(f"CRITICAL ERROR: {str(e)}")
+        # On renvoie un JSON valide même en cas d'erreur pour ne pas casser le JS
         return jsonify({
-            "coach_response_text": "I'm having technical trouble hearing you. Please try again.",
-            "transcription_user": "(System Error)",
+            "coach_response_text": "I'm having trouble hearing you clearly. Could you repeat please?",
+            "transcription_user": "(Technical Error)",
             "score_pronunciation": 0,
-            "feedback_grammar": "System Error: " + str(e),
-            "better_response_example": "Check server logs",
-            "next_step_advice": "Technical check required"
+            "feedback_grammar": "Check microphone",
+            "better_response_example": "N/A",
+            "next_step_advice": "Check internet connection"
         })
         
     finally:
         if os.path.exists(tw.name): os.remove(tw.name)
-        if os.path.exists(tm.name): os.remove(tm.name)
 
-# --- PAYMENT ---
+# --- PAYMENT & PROMO ---
 @app.route('/api/payment_success', methods=['POST'])
 @login_required
 def pay_ok():

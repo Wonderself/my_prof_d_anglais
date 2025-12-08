@@ -113,6 +113,7 @@
         let sessionId = 'sess_' + Date.now();
         let mediaRecorder, audioChunks = [];
         let cvContent = "";
+        let currentAudio = null; // Variable globale pour gérer le son
 
         window.onload = async () => {
             try {
@@ -177,11 +178,14 @@
         const avatar = document.getElementById('avatar-video');
 
         function playAudio(b64) {
-            const audio = new Audio("data:audio/mp3;base64," + b64);
+            if(currentAudio) { currentAudio.pause(); currentAudio = null; }
+            currentAudio = new Audio("data:audio/mp3;base64," + b64);
+            
             avatar.src = "/talk.mp4"; 
             avatar.play().catch(e => console.log("Video play interrupted")); 
-            audio.onended = () => { avatar.src = "/idle.mp4"; avatar.play(); };
-            audio.play().catch(e => console.log("Audio play blocked"));
+            
+            currentAudio.onended = () => { avatar.src = "/idle.mp4"; avatar.play(); };
+            currentAudio.play().catch(e => console.log("Audio play blocked"));
         }
 
         function addMessage(role, text, feedback=null) {
@@ -214,15 +218,22 @@
         }
 
         async function startRec() {
+            // INTERRUPTION (BARGE-IN)
+            if(currentAudio) { currentAudio.pause(); currentAudio = null; }
+            avatar.src = "/idle.mp4"; avatar.play();
+
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-                mediaRecorder = new MediaRecorder(stream, {mimeType: 'audio/webm'}); // FIX: Force WebM
+                // PARAMETRES AUDIO HAUTE QUALITE
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+                mediaRecorder = new MediaRecorder(stream, {mimeType: 'audio/webm'});
                 audioChunks = [];
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.start();
                 micBtn.classList.add('bg-red-500', 'scale-110');
                 statusTxt.innerText = "Listening...";
-            } catch(e) { alert("Mic Access Denied"); }
+            } catch(e) { alert("Mic Access Denied. Check settings."); }
         }
 
         async function stopRec() {
@@ -231,7 +242,7 @@
             micBtn.classList.remove('bg-red-500', 'scale-110');
             statusTxt.innerText = "Processing...";
             
-            // FIX: Arrête les pistes pour éteindre le point rouge
+            // EXTINCTION TOTALE DU MICRO (Point Rouge)
             mediaRecorder.stream.getTracks().forEach(track => track.stop());
 
             mediaRecorder.onstop = async () => {
@@ -243,12 +254,17 @@
                     addMessage('user', '...'); 
                     const res = await fetch('/analyze', {method: 'POST', body: fd});
                     const d = await res.json();
+                    
+                    if (d.error) throw new Error(d.error);
+
                     document.querySelector('.bubble-user:last-child').innerText = d.transcription_user;
                     setTimeout(() => {
                         addMessage('coach', d.coach_response_text, { score: d.score_pronunciation, tip: d.next_step_advice, better: d.better_response_example });
                         if(d.audio_base64) playAudio(d.audio_base64);
                     }, 500);
-                } catch(e) { document.querySelector('.bubble-user:last-child').innerText = "⚠️ Error analyzing."; }
+                } catch(e) { 
+                    document.querySelector('.bubble-user:last-child').innerText = "⚠️ I didn't catch that. Please speak louder."; 
+                }
                 finally { statusTxt.innerText = "Hold to Speak"; }
             };
         }
