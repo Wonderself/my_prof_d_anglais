@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, redirect, url_for, session, send_from
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
-from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.middleware.proxy_fix import ProxyMiddleware  # CORRECTION : Import de ProxyMiddleware au lieu de ProxyFix
 from pydub import AudioSegment
 import google.generativeai as genai
 import psycopg2
@@ -33,8 +33,17 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = SECRET_KEY
 CORS(app)
 
-# FIX: HTTPS sur Render (Étendu pour Auth)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_forwarded_for=1, x_port=1)
+# CORRECTION : Remplacement de ProxyFix par ProxyMiddleware pour Werkzeug 3.x
+# Trusted_proxies='0.0.0.0/0' pour dev/Render (restreignez en prod à des IPs spécifiques)
+app.wsgi_app = ProxyMiddleware(
+    app.wsgi_app,
+    trusted_proxies=('0.0.0.0/0',),
+    x_for=1,    # Équivalent à x_forwarded_for=1
+    x_proto=1,  # Équivalent à x_proto=1
+    x_host=1,   # Équivalent à x_host=1
+    x_port=1,   # Équivalent à x_port=1
+    x_prefix=0  # Pas de prefix needed
+)
 
 # FIX CSP: Headers Robustes pour PayPal/Tailwind (Autorise unsafe-inline/eval sans risque excessif)
 @app.after_request
