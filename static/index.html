@@ -24,6 +24,11 @@
         /* Permet le scroll sur petit écran mobile, mais fixe sur PC */
         #setup-screen-inner { max-height: 100dvh; overflow-y: auto; }
     </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007AFF">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body class="text-slate-800">
 
@@ -365,5 +370,15 @@
             }
         }
     </script>
+<script>
+    // Enregistrement du Service Worker pour le mode Hors-Ligne/Rapide
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(reg => console.log('Service Worker Registered ✅'))
+                .catch(err => console.log('Service Worker Failed ❌', err));
+        });
+    }
+</script>
 </body>
 </html>

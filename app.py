@@ -25,6 +25,16 @@ except Exception as e:
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
+# --- OPTIMISATION CACHE (PWA & VITESSE) ---
+# C'est ici qu'on dit au navigateur : "Garde les vidéos en mémoire 1 an !"
+@app.after_request
+def add_header(response):
+    # Si le fichier demandé est une vidéo ou une image
+    if request.path.startswith('/') and (request.path.endswith('.mp4') or request.path.endswith('.png') or request.path.endswith('.jpg')):
+        response.cache_control.max_age = 31536000 # 31536000 secondes = 1 an
+        response.cache_control.public = True
+    return response
+
 # --- DATABASE ---
 def get_db_connection():
     try:
@@ -60,7 +70,7 @@ def get_prompt(name, job, company, cv, history_len):
     """
     Prompt Engineering Avancé pour structurer l'entretien et forcer l'usage du CV.
     """
-    # Détection approximative de l'étape de l'entretien basée sur la longueur de l'historique
+    # Détection approximative de l'étape de l'entretien
     stage = "INTRODUCTION"
     if history_len > 2: stage = "DEEP DIVE EXPERIENCE (Challenge the CV)"
     if history_len > 6: stage = "HARD SKILLS & TECHNICAL"
@@ -127,13 +137,13 @@ def analyze():
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
         sess = cur.fetchone()
-        cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC", (sid,)) # On prend tout pour le contexte
+        cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC", (sid,))
         hist_rows = cur.fetchall()
         conn.close()
 
-        # On garde les 10 derniers échanges pour le contexte immédiat
+        # On garde les 10 derniers échanges pour le contexte
         hist = [{"role": r['role'], "parts": [r['content']]} for r in hist_rows[-10:]]
-        history_len = len(hist_rows) # On utilise la longueur totale pour savoir où on en est dans l'ITV
+        history_len = len(hist_rows)
         
         sys_prompt = get_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], history_len)
         
@@ -148,7 +158,6 @@ def analyze():
         try:
             data = json.loads(resp.text)
         except:
-            # Fallback nettoyage markdown
             clean = resp.text.replace('```json', '').replace('```', '').strip()
             data = json.loads(clean)
         
