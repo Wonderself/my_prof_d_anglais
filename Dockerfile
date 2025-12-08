@@ -1,4 +1,5 @@
-FROM python:3.9-slim
+# ON PASSE À PYTHON 3.11 (Plus récent, plus rapide, et supprime les warnings Google)
+FROM python:3.11-slim
 
 # Installe les outils systèmes (FFmpeg pour l'audio, libpq pour la DB)
 RUN apt-get update && apt-get install -y \
@@ -14,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Render définit la variable PORT automatiquement
+# Render définit la variable PORT automatiquement (souvent 10000)
 ENV PORT=10000
 
 # Lancement PROD avec Gunicorn
