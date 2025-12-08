@@ -103,4 +103,338 @@
                         <span id="cv-status" class="text-[9px] text-slate-400">No file</span>
                     </label>
                     <input id="inp-cv" type="file" accept=".txt,.pdf,.doc,.docx" class="hidden" onchange="readCVFile()">
-                    <button onclick="document.getElementById('inp-cv').click()" class="w-full p-3 md:p-2.5 bg-slate-100 rounded-xl font-medium text-xs md:text-
+                    <button onclick="document.getElementById('inp-cv').click()" class="w-full p-3 md:p-2.5 bg-slate-100 rounded-xl font-medium text-xs md:text-sm text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all flex justify-center items-center gap-2">
+                        <i class="fas fa-file-upload"></i> <span id="btn-cv-text">Upload / Update CV</span>
+                    </button>
+                    <textarea id="cv-content" class="hidden"></textarea>
+                </div>
+
+                <div class="pt-3 md:pt-4">
+                    <button onclick="event.preventDefault();startSession()" class="w-full bg-blue-600 text-white p-4 md:p-3 rounded-xl font-bold text-base md:text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
+                        Start Interview <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button onclick="window.location.href='/logout'" class="mt-3 w-full text-center text-xs text-slate-300 hover:text-slate-500">Logout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <header id="chat-header" class="hidden bg-white/90 backdrop-blur-md border-b p-2 md:p-3 z-10 shadow-sm shrink-0 relative">
+        <div class="flex flex-col md:flex-row items-center justify-center md:gap-4 relative max-w-4xl mx-auto w-full">
+            
+            <button onclick="returnToSetup()" class="absolute right-3 top-4 text-slate-300 hover:text-slate-500 md:static md:mr-auto md:bg-slate-100 md:p-2 md:rounded-lg md:text-slate-600 md:hover:bg-slate-200 transition-colors">
+                <i class="fas fa-home"></i> <span class="hidden md:inline ml-1">Home</span>
+            </button>
+            
+            <div class="flex flex-col md:flex-row items-center gap-1 md:gap-3 mt-4 md:mt-0">
+                <div class="relative w-16 h-16 md:w-14 md:h-14 group shrink-0">
+                    <div class="w-full h-full rounded-full overflow-hidden border-2 border-white shadow-md relative bg-slate-200">
+                        <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
+                        <video id="vid-talk" src="talk.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
+                        <img id="avatar-img" src="coach_static.png" class="w-full h-full object-cover hidden" alt="Sarah">
+                    </div>
+                    <div id="audio-indicator" class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center opacity-0 transition-opacity">
+                        <i class="fas fa-volume-up text-white text-[8px]"></i>
+                    </div>
+                </div>
+                <div class="text-center md:text-left">
+                    <h2 class="font-bold text-xs md:text-base text-slate-800">Sarah</h2>
+                    <p id="role-display" class="text-[9px] md:text-[10px] uppercase font-bold text-blue-600 tracking-widest">JOB ITV SIMULATOR</p>
+                </div>
+            </div>
+            <div class="hidden md:block md:ml-auto w-[60px]"></div>
+        </div>
+    </header>
+
+    <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50 w-full max-w-3xl mx-auto scroll-smooth hidden"></main>
+
+    <footer id="chat-footer" class="hidden bg-white border-t p-4 pb-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 shrink-0 w-full max-w-3xl mx-auto">
+        <div class="flex flex-col items-center">
+            <p id="status-txt" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 h-3 transition-all">Tap mic to answer</p>
+            <button id="mic-btn" class="w-16 h-16 rounded-full bg-blue-600 text-white text-2xl shadow-blue-200 shadow-xl flex items-center justify-center transition-all active:scale-90 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale" disabled>
+                <div id="btn-icon"><i class="fas fa-microphone"></i></div>
+                <div id="btn-loader" class="hidden w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = ""; 
+        let sessionId = localStorage.getItem('coach_sess') || 'sess_' + Date.now();
+        localStorage.setItem('coach_sess', sessionId);
+        
+        let mediaRecorder;
+        let audioChunks = [];
+        let userCV = "";
+
+        // --- 1. AUTH & PAYMENT CHECK (ROBUSTE) ---
+        async function checkUser() {
+            const loader = document.getElementById('loader-screen');
+            try {
+                // On tente de contacter le serveur
+                const res = await fetch('/api/me');
+                
+                // Si le serveur répond 404 ou 500, on force l'erreur pour aller au catch
+                if (!res.ok) throw new Error("Server Error or Not Logged In");
+
+                const data = await res.json();
+                
+                if (!data.logged_in) {
+                    document.getElementById('login-screen').classList.remove('hidden');
+                } else if (!data.is_paid) {
+                    document.getElementById('payment-screen').classList.remove('hidden');
+                    initPayPal();
+                } else {
+                    document.getElementById('setup-screen').classList.remove('hidden');
+                    
+                    if (data.name) document.getElementById('inp-name').value = data.name;
+                    if (data.saved_cv) {
+                        userCV = data.saved_cv;
+                        document.getElementById('cv-content').value = userCV;
+                        document.getElementById('cv-status').innerText = "Loaded from profile ✅";
+                        document.getElementById('cv-status').classList.add('text-green-600');
+                        document.getElementById('btn-cv-text').innerText = "Update Resume";
+                    }
+                }
+            } catch (e) { 
+                console.warn("Auth Check Failed (Normal if first time):", e);
+                // EN CAS D'ERREUR, ON MONTRE L'ÉCRAN DE LOGIN PAR DÉFAUT
+                document.getElementById('login-screen').classList.remove('hidden');
+            } finally {
+                // QUOI QU'IL ARRIVE, ON VIRE LE LOADER
+                loader.classList.add('opacity-0');
+                setTimeout(() => loader.style.display = 'none', 500);
+            }
+        }
+        
+        window.onload = checkUser;
+
+        // --- 2. PAYPAL LOGIC ---
+        function initPayPal() {
+            if (!window.paypal) return;
+            paypal.Buttons({
+                createOrder: function(data, actions) {
+                    return actions.order.create({
+                        purchase_units: [{ amount: { value: '9.99' } }]
+                    });
+                },
+                onApprove: function(data, actions) {
+                    return actions.order.capture().then(function(details) {
+                        // Paiement réussi, on prévient le serveur
+                        document.getElementById('payment-screen').innerHTML = '<div class="text-center"><h2 class="text-2xl font-bold text-green-600">Payment Success!</h2><p>Redirecting...</p></div>';
+                        fetch('/api/payment_success', { method: 'POST' }).then(() => location.reload());
+                    });
+                }
+            }).render('#paypal-button-container');
+        }
+
+        // --- 3. CV HANDLING ---
+        function readCVFile() {
+            const fileInput = document.getElementById('inp-cv');
+            const file = fileInput.files[0];
+            const status = document.getElementById('cv-status');
+            const cvContent = document.getElementById('cv-content');
+            
+            if (!file) return;
+
+            if (file.size > 1024 * 1024 * 1) { 
+                status.innerText = "Max 1MB"; status.classList.add('text-red-500'); return;
+            }
+            
+            status.innerText = `Reading...`;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                cvContent.value = e.target.result;
+                status.innerText = `Ready to upload`;
+                status.classList.remove('text-red-500');
+                status.classList.add('text-blue-600');
+            };
+            reader.readAsText(file);
+        }
+
+        // --- 4. AVATAR & NAVIGATION ---
+        const vidIdle = document.getElementById('vid-idle');
+        const vidTalk = document.getElementById('vid-talk');
+        const imgAvatar = document.getElementById('avatar-img');
+        const audioIndicator = document.getElementById('audio-indicator');
+
+        function initAvatar() {
+            vidIdle.play().then(() => {
+                imgAvatar.style.display = 'none'; vidIdle.classList.remove('hidden');
+            }).catch(e => console.warn("Autoplay blocked", e));
+        }
+        
+        function setAvatarState(isTalking) {
+            audioIndicator.style.opacity = isTalking ? '1' : '0';
+            if (isTalking) {
+                vidIdle.classList.add('hidden'); vidTalk.classList.remove('hidden'); vidTalk.play();
+            } else {
+                vidTalk.classList.add('hidden'); vidIdle.classList.remove('hidden'); vidIdle.play();
+            }
+        }
+
+        function returnToSetup() {
+            if (confirm("Stop interview?")) {
+                location.reload(); 
+            }
+        }
+
+        // --- 5. CHAT CORE ---
+        function playAudio(base64Audio) {
+            if (!base64Audio) return;
+            const audio = new Audio("data:audio/mp3;base64," + base64Audio);
+            audio.onplay = () => setAvatarState(true);
+            audio.onended = () => setAvatarState(false);
+            audio.onerror = () => setAvatarState(false);
+            audio.play().catch(console.warn);
+        }
+
+        function addMsg(role, text, feedback=null) {
+            const box = document.getElementById('chat-box');
+            const isCoach = role === 'coach';
+            const div = document.createElement('div');
+            div.className = `bubble flex flex-col ${isCoach ? 'items-start' : 'items-end'} mb-4`;
+            
+            let html = `
+                <div class="px-5 py-3 rounded-2xl max-w-[90%] text-sm leading-relaxed shadow-sm 
+                            ${isCoach ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200' : 'bg-blue-600 text-white rounded-tr-none'}">
+                    ${text}
+                </div>`;
+
+            if (feedback) {
+                const scoreColor = feedback.score >= 8 ? 'bg-green-500' : (feedback.score >= 5 ? 'bg-orange-500' : 'bg-red-500');
+                html += `
+                <div class="mt-2 ml-1 w-[95%] bg-white p-4 rounded-xl border border-slate-200 shadow-md space-y-3 relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1 h-full ${scoreColor}"></div>
+                    <div class="flex justify-between items-end border-b border-slate-100 pb-2">
+                        <div>
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">Score</span>
+                            <span class="text-xl font-bold text-slate-800">${feedback.score}<span class="text-xs text-slate-400">/10</span></span>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-xs">
+                        ${feedback.grammar && feedback.grammar.length > 2 ? `<div class="text-slate-600"><strong class="text-red-500 block text-[9px] uppercase">Correction</strong>${feedback.grammar}</div>` : ''}
+                        <div><strong class="text-blue-500 block text-[9px] uppercase">Tip</strong>${feedback.tip}</div>
+                    </div>
+                    <div class="pt-2 mt-1 border-t border-slate-100">
+                        <div class="relative group cursor-pointer" onclick="this.querySelector('.blur-reveal').classList.add('revealed');">
+                            <div class="blur-reveal p-2 bg-slate-50 rounded text-slate-800 italic text-xs border border-slate-100">"${feedback.better}"</div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            div.innerHTML = html;
+            box.appendChild(div);
+            setTimeout(() => { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); }, 50);
+        }
+
+        async function startSession() {
+            const name = document.getElementById('inp-name').value;
+            const job = document.getElementById('inp-job').value;
+            const company = document.getElementById('inp-company').value;
+            const cvContent = document.getElementById('cv-content').value;
+
+            // Transition UI
+            document.getElementById('setup-screen').style.transform = 'translateY(-100%)';
+            setTimeout(() => {
+                 document.getElementById('setup-screen').classList.add('hidden');
+                 document.getElementById('chat-header').classList.remove('hidden');
+                 document.getElementById('chat-box').classList.remove('hidden');
+                 document.getElementById('chat-footer').classList.remove('hidden');
+                 initAvatar();
+            }, 500);
+
+            try {
+                const res = await fetch(`${API_URL}/start_chat`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        session_id: sessionId, 
+                        candidate_name: name, 
+                        job_title: job, 
+                        company_type: company, 
+                        cv_content: cvContent 
+                    })
+                });
+                const data = await res.json();
+                
+                if(data.error) {
+                    alert(data.error); location.reload(); return;
+                }
+
+                addMsg('coach', data.coach_response_text);
+                if (data.audio_base64) playAudio(data.audio_base64);
+                initMic();
+            } catch (e) {
+                alert("Server Error"); location.reload();
+            }
+        }
+
+        async function initMic() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                mediaRecorder.onstop = sendAudio;
+                
+                const btn = document.getElementById('mic-btn');
+                btn.disabled = false;
+                
+                const startRec = (e) => {
+                    e.preventDefault(); audioChunks = []; mediaRecorder.start();
+                    btn.classList.add('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.remove('bg-blue-600', 'text-2xl');
+                    document.getElementById('status-txt').innerText = "Listening...";
+                    document.getElementById('status-txt').classList.add('text-red-500');
+                };
+                const stopRec = (e) => {
+                    e.preventDefault(); if (mediaRecorder.state === 'recording') mediaRecorder.stop();
+                    btn.classList.remove('scale-110', 'bg-red-500', 'text-3xl'); btn.classList.add('bg-blue-600', 'text-2xl');
+                    document.getElementById('status-txt').classList.remove('text-red-500');
+                };
+                btn.addEventListener('mousedown', startRec); btn.addEventListener('touchstart', startRec);
+                btn.addEventListener('mouseup', stopRec); btn.addEventListener('touchend', stopRec);
+            } catch (e) { alert("Mic required"); }
+        }
+
+        async function sendAudio() {
+            await new Promise(r => setTimeout(r, 200));
+            if (audioChunks.length === 0) return;
+
+            const btnIcon = document.getElementById('btn-icon');
+            const loader = document.getElementById('btn-loader');
+            const status = document.getElementById('status-txt');
+            btnIcon.classList.add('hidden'); loader.classList.remove('hidden');
+            status.innerText = "Sarah is thinking...";
+
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            const fd = new FormData();
+            fd.append('audio', blob); fd.append('session_id', sessionId);
+
+            try {
+                const res = await fetch(`${API_URL}/analyze`, { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+
+                addMsg('user', data.transcription_user);
+                setTimeout(() => {
+                    addMsg('coach', data.coach_response_text, {
+                        score: data.score_pronunciation, grammar: data.feedback_grammar,
+                        tip: data.next_step_advice, better: data.better_response_example
+                    });
+                    if (data.audio_base64) playAudio(data.audio_base64);
+                }, 600);
+            } catch (e) { status.innerText = "Error"; addMsg('coach', `⚠️ Error`); } 
+            finally {
+                btnIcon.classList.remove('hidden'); loader.classList.add('hidden');
+                status.innerText = "Hold to Answer";
+            }
+        }
+        
+        // PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
+        }
+    </script>
+</body>
+</html>
