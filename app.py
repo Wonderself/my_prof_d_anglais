@@ -1,6 +1,7 @@
 import os, sys, tempfile, json, time, base64, datetime, logging
 from flask import Flask, request, jsonify, redirect, url_for, session, send_from_directory
 from flask_cors import CORS
+# FIX CRITIQUE: Assure LoginManager est bien importé
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -52,13 +53,13 @@ login_manager.init_app(app)
 login_manager.login_view = 'index'
 
 oauth = OAuth(app)
-# FIX: Configuration Google Login (Résout l'erreur 'Invalid URL userinfo')
+# FIX: Configuration Google Login (Résout l'erreur 'Invalid URL userinfo' et l'erreur '.json()')
 google = oauth.register(
     name='google',
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    userinfo_endpoint='https://www.googleapis.com/oauth2/v1/userinfo', # URL COMPLÈTE AJOUTÉE ICI
+    userinfo_endpoint='https://www.googleapis.com/oauth2/v1/userinfo', # URL COMPLÈTE
     client_kwargs={'scope': 'openid email profile'},
 )
 
@@ -147,9 +148,9 @@ def login(): return google.authorize_redirect(url_for('authorize', _external=Tru
 def authorize():
     try:
         token = google.authorize_access_token()
-        # FIX LOGIC: Utilise l'objet configuré userinfo pour récupérer les données
-        resp = oauth.google.userinfo(token=token) 
-        user_info = resp.json()
+        
+        # FIX: Utilisation directe de userinfo sans .json()
+        user_info = oauth.google.userinfo(token=token) 
         
         conn = get_db_connection()
         if not conn:
@@ -157,7 +158,7 @@ def authorize():
 
         cur = conn.cursor()
         cur.execute("INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s) ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name RETURNING *;", 
-                   (user_info['id'], user_info['email'], user_info['name']))
+                   (user_info['sub'], user_info['email'], user_info['name']))
         u = cur.fetchone()
         conn.commit(); conn.close()
         
@@ -169,7 +170,7 @@ def authorize():
         <div style='font-family:sans-serif; padding:50px; text-align:center;'>
             <h1 style='color:red;'>ERREUR DE CONNEXION (CODE)</h1>
             <p style='background:#eee; padding:20px; border-radius:10px; font-family:monospace;'>{str(e)}</p>
-            <p>Si l'erreur persiste après cette correction, vérifiez les clés GOOGLE_CLIENT_SECRET.</p>
+            <p>Si l'erreur persiste, cela peut être une erreur dans l'URL de redirection Google.</p>
         </div>
         """
 
