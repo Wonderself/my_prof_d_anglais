@@ -31,7 +31,7 @@
     <div id="loader-screen" class="fixed inset-0 bg-slate-800 z-50 flex flex-col items-center justify-center p-6 transition-opacity duration-500">
         <div class="animate-pulse text-white text-center">
             <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p class="text-sm font-semibold tracking-wider uppercase">ROBOT WAKING UP</p>
+            <p class="text-sm font-semibold tracking-wider uppercase">ROBOT WAKING UP...</p>
         </div>
     </div>
 
@@ -60,16 +60,13 @@
                 <p class="font-semibold text-slate-800 mb-4">Why choose JOB ITV SIMULATOR?</p>
                 <ul class="space-y-3 text-sm text-slate-600">
                     <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **Personalized Masterclass:** Our V6 model analyzes your uploaded CV, challenging your experience with **specific questions** about your past projects and achievements, not generic phrases.
+                        **Personalized Masterclass:** Our V6 model analyzes your uploaded CV, challenging your experience with **specific questions**.
                     </li>
                     <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **Real-Time Language Correction:** Get instant, actionable feedback on your grammar, pronunciation, and flow to ensure native-level confidence.
+                        **Real-Time Language Correction:** Get instant feedback on your grammar and pronunciation.
                     </li>
                     <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **AI-Driven Benchmarking:** See the perfect, high-impact response for every answer, crafted using the exact details from your resume (the 'Better Response Example').
-                    </li>
-                    <li class="flex items-start gap-3"><i class="fas fa-check-circle text-blue-500 mt-1 shrink-0"></i> 
-                        **24/7 Access & PWA:** Practice anywhere, anytime. Optimized for speed and mobile experience (PWA).
+                        **AI-Driven Benchmarking:** See the perfect "Masterclass" response for every question.
                     </li>
                 </ul>
             </div>
@@ -81,8 +78,8 @@
             </div>
 
             <div class="flex gap-2 w-full max-w-sm mx-auto mb-6">
-                <input id="promo-code-input" type="text" placeholder="Enter Promo Code" class="flex-1 p-3 border border-slate-300 rounded-xl font-semibold uppercase outline-none focus:ring-2 ring-blue-500">
-                <button onclick="applyPromoCode()" class="bg-blue-600 text-white p-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shrink-0" id="apply-promo-btn">Apply</button>
+                <input id="promo-code-input" type="text" placeholder="ENTER PROMO CODE" class="flex-1 p-3 border border-slate-300 rounded-xl font-semibold uppercase outline-none focus:ring-2 ring-blue-500 text-sm">
+                <button onclick="applyPromoCode()" class="bg-blue-600 text-white p-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shrink-0" id="apply-promo-btn">APPLY</button>
             </div>
             <p id="promo-message" class="text-center text-xs font-semibold mb-4 h-4"></p>
 
@@ -102,11 +99,11 @@
                 <div class="text-center md:text-left mt-3 md:mt-0">
                     <h1 class="text-2xl md:text-4xl font-bold text-slate-900 tracking-tight mb-0.5">JOB ITV SIMULATOR</h1>
                     <div class="flex items-center justify-center md:justify-start gap-2">
-                        <p class="text-blue-600 font-bold tracking-widest text-[10px] md:text-xs uppercase">Premium Member</p>
+                        <p class="text-blue-600 font-bold tracking-widest text-[10px] md:text-xs uppercase">PREMIUM MEMBER</p>
                         <i class="fas fa-check-circle text-blue-500 text-xs"></i>
                     </div>
                     <p class="hidden md:block text-slate-400 text-xs mt-1 max-w-sm leading-tight">
-                        Configurez votre rôle, chargez votre CV et commencez la simulation.
+                        Configure your role, upload your CV and start the simulation.
                     </p>
                 </div>
             </div>
@@ -114,23 +111,23 @@
             <div class="space-y-3 md:space-y-3 shrink-0 md:px-12">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <div>
-                        <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1">Candidate Name</label>
+                        <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1">CANDIDATE NAME</label>
                         <input id="inp-name" type="text" class="w-full p-3 md:p-2.5 text-sm bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="">
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1">Target Role</label>
+                        <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1">TARGET ROLE</label>
                         <input id="inp-job" type="text" class="w-full p-3 md:p-2.5 text-sm bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Product Manager">
                     </div>
                 </div>
                 
                 <div>
-                    <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1">Company Context</label>
+                    <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1">COMPANY CONTEXT</label>
                     <input id="inp-company" type="text" class="w-full p-3 md:p-2.5 text-sm bg-slate-50 rounded-xl font-semibold outline-none focus:ring-2 ring-blue-500 border border-slate-200 transition-all" value="Tech Startup">
                 </div>
 
                 <div>
                     <label for="inp-cv" class="text-[10px] font-bold uppercase text-slate-400 tracking-wider ml-1 flex items-center justify-between">
-                        My Resume
+                        MY RESUME
                         <span id="cv-status" class="text-[9px] text-slate-400">No file</span>
                     </label>
                     <input id="inp-cv" type="file" accept=".txt,.pdf,.doc,.docx" class="hidden" onchange="readCVFile()">
@@ -142,9 +139,9 @@
 
                 <div class="pt-3 md:pt-4">
                     <button onclick="event.preventDefault();startSession()" class="w-full bg-blue-600 text-white p-4 md:p-3 rounded-xl font-bold text-base md:text-lg shadow-xl hover:bg-blue-700 transition-all transform active:scale-95 duration-100 flex items-center justify-center gap-2">
-                        Start Interview <i class="fas fa-arrow-right"></i>
+                        START INTERVIEW <i class="fas fa-arrow-right"></i>
                     </button>
-                    <button onclick="window.location.href='/logout'" class="mt-3 w-full text-center text-xs text-slate-300 hover:text-slate-500">Logout</button>
+                    <button onclick="window.location.href='/logout'" class="mt-3 w-full text-center text-xs text-slate-300 hover:text-slate-500">LOGOUT</button>
                 </div>
             </div>
         </div>
@@ -158,9 +155,8 @@
             <div class="flex flex-col md:flex-row items-center gap-1 md:gap-3 mt-4 md:mt-0">
                 <div class="relative w-16 h-16 md:w-14 md:h-14 group shrink-0">
                     <div class="w-full h-full rounded-full overflow-hidden border-2 border-white shadow-md relative bg-slate-200">
-                        <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover"></video>
+                        <video id="vid-idle" src="idle.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
                         <video id="vid-talk" src="talk.mp4" loop muted playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
-                        
                     </div>
                     <div id="audio-indicator" class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center opacity-0 transition-opacity">
                         <i class="fas fa-volume-up text-white text-[8px]"></i>
@@ -179,7 +175,7 @@
 
     <footer id="chat-footer" class="hidden bg-white border-t p-4 pb-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 shrink-0 w-full max-w-3xl mx-auto">
         <div class="flex flex-col items-center">
-            <p id="status-txt" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 h-3 transition-all">Tap mic to answer</p>
+            <p id="status-txt" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 h-3 transition-all">TAP MIC TO ANSWER</p>
             <button id="mic-btn" class="w-16 h-16 rounded-full bg-blue-600 text-white text-2xl shadow-blue-200 shadow-xl flex items-center justify-center transition-all active:scale-90 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale" disabled>
                 <div id="btn-icon"><i class="fas fa-microphone"></i></div>
                 <div id="btn-loader" class="hidden w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -196,7 +192,7 @@
         let audioChunks = [];
         let userCV = "";
 
-        // --- 1. AUTH & PAYMENT CHECK (ROBUSTE) ---
+        // --- 1. AUTH & PAYMENT CHECK ---
         async function checkUser() {
             const loader = document.getElementById('loader-screen');
             try {
@@ -221,7 +217,6 @@
                     }
                 }
             } catch (e) { 
-                // En cas d'échec du serveur (Timeout, 500, 503), on affiche le login pour forcer l'utilisateur à se connecter/vérifier
                 console.warn("Auth Check Failed:", e);
                 document.getElementById('login-screen').classList.remove('hidden');
             } finally {
@@ -301,7 +296,7 @@
             }
         }
 
-        // --- 4. CV HANDLING ---
+        // --- 4. CV HANDLING & CORE ---
         function readCVFile() {
             const fileInput = document.getElementById('inp-cv');
             const file = fileInput.files[0];
@@ -309,7 +304,6 @@
             const cvContent = document.getElementById('cv-content');
             
             if (!file) return;
-
             if (file.size > 1024 * 1024 * 1) { 
                 status.innerText = "Max 1MB"; status.classList.add('text-red-500'); return;
             }
@@ -325,7 +319,7 @@
             reader.readAsText(file);
         }
 
-        // --- 5. AVATAR & NAVIGATION ---
+        // --- AVATAR ---
         const vidIdle = document.getElementById('vid-idle');
         const vidTalk = document.getElementById('vid-talk');
         const audioIndicator = document.getElementById('audio-indicator');
@@ -351,7 +345,7 @@
             }
         }
 
-        // --- 6. CHAT CORE ---
+        // --- CHAT LOGIC ---
         function playAudio(base64Audio) {
             if (!base64Audio) return;
             const audio = new Audio("data:audio/mp3;base64," + base64Audio);
