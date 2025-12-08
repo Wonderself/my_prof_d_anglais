@@ -31,7 +31,7 @@ app.config['PREFERRED_URL_SCHEME'] = 'https'
 CORS(app)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# --- CSP HEADERS (CORRIGÉS POUR PAYPAL SANDBOX) ---
+# --- CSP HEADERS (CORRIGÉS: AJOUT DE SANDBOX PAYPAL) ---
 @app.after_request
 def add_security_headers(response):
     csp = (
@@ -148,11 +148,11 @@ def authorize():
         resp = google.get('userinfo')
         user_info = resp.json()
         
-        # DEBUGGING: Si ça plante ici, on veut voir pourquoi
         conn = get_db_connection()
         if not conn:
-            return "<h1>ERREUR DB</h1><p>Impossible de se connecter à Neon DB. Vérifiez DATABASE_URL dans Render (pas de guillemets !).</p>"
-            
+            # DEBUG: Affiche si la DB ne répond pas
+            return "<h1>ERREUR CRITIQUE DB</h1><p>Impossible de se connecter à la base Neon. Vérifiez DATABASE_URL dans Render (pas de guillemets, bon mot de passe).</p>"
+
         cur = conn.cursor()
         cur.execute("INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s) ON CONFLICT (google_id) DO UPDATE SET name = EXCLUDED.name RETURNING *;", 
                    (user_info['id'], user_info['email'], user_info['name']))
@@ -163,8 +163,8 @@ def authorize():
         return redirect('/')
     except Exception as e: 
         logger.error(f"AUTH FAIL: {e}")
-        # AFFICHE L'ERREUR À L'ÉCRAN AU LIEU DE REDIRIGER
-        return f"<h1>LOGIN ERROR</h1><p>Erreur technique : {str(e)}</p>"
+        # DEBUG: Affiche l'erreur exacte à l'écran
+        return f"<h1>LOGIN ERROR</h1><p style='color:red; font-weight:bold;'>{str(e)}</p><p>Copie ce message pour l'envoyer à l'expert.</p>"
 
 @app.route('/logout')
 @login_required
