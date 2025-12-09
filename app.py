@@ -1,4 +1,4 @@
-import os, sys, tempfile, json, time, base64, datetime, logging
+import os, sys, tempfile, json, time, base64, datetime, logging, subprocess, uuid
 from flask import Flask, request, jsonify, redirect, url_for, session, send_from_directory
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -13,7 +13,7 @@ from urllib.parse import quote
 from pypdf import PdfReader
 from docx import Document
 
-# --- LOGGING CONFIG ---
+# --- LOGGING ---
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -61,16 +61,14 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
-if API_KEY: 
-    genai.configure(api_key=API_KEY)
-    logger.info(f"GenAI Version: {genai.__version__}") # ON LOG LA VERSION POUR ETRE SUR
+if API_KEY: genai.configure(api_key=API_KEY)
 
 # --- DB LOGIC ---
 DB_INITIALIZED = False
 
 def get_db_connection():
     try: return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    except Exception as e: logger.error(f"DB CONNECT ERROR: {e}"); return None
+    except Exception as e: logger.error(f"DB ERROR: {e}"); return None
 
 def init_tables():
     conn = get_db_connection()
@@ -83,7 +81,6 @@ def init_tables():
         try: cur.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
         except: conn.rollback()
         conn.commit(); conn.close()
-        logger.info(">>> DB TABLES READY")
     except Exception as e: logger.error(f"DB INIT ERROR: {e}")
 
 @app.before_request
@@ -110,14 +107,25 @@ def load_user(user_id):
     except: pass
     return None
 
-# --- AI LOGIC ---
+# --- TTS (EDGE - MEILLEURE QUALITÉ) ---
 def generate_tts(text):
     try:
-        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:900])}"
-        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-        if r.status_code == 200: return base64.b64encode(r.content).decode('utf-8')
-    except: pass
-    return None
+        if not text: return None
+        clean_text = text.replace('"', '').replace("'", "").replace("\n", " ")[:1000]
+        # Nom de fichier unique pour éviter les conflits
+        unique_name = f"tts_{uuid.uuid4().hex}.mp3"
+        
+        # Appel système pour Edge TTS (Voix Aria = Top Qualité)
+        cmd = ["edge-tts", "--voice", "en-US-AriaNeural", "--text", clean_text, "--write-media", unique_name]
+        subprocess.run(cmd, check=True)
+        
+        with open(unique_name, "rb") as f:
+            audio_data = base64.b64encode(f.read()).decode('utf-8')
+        os.remove(unique_name)
+        return audio_data
+    except Exception as e:
+        logger.error(f"TTS ERROR: {e}")
+        return None
 
 def get_ai_prompt(name, job, company, cv, history_len):
     stage = "INTRODUCTION"
@@ -129,24 +137,24 @@ def get_ai_prompt(name, job, company, cv, history_len):
     
     return f"""
     ROLE: You are an expert recruiter at {company}. Interviewing {name} for {job}.
-    TONE: Professional, concise, challenging but fair. Spoken English.
+    TONE: Professional, concise, fair but tough. Spoken English.
     STAGE: {stage}
     CANDIDATE CV: "{cv_text}"
     
-    INSTRUCTIONS:
-    1. Listen to the candidate's audio.
-    2. Check against the CV.
-    3. Ask a FOLLOW-UP question based on the CV.
-    4. Create a "MASTERCLASS" example answer.
+    MISSION:
+    1. Listen to the audio.
+    2. Check consistency with CV.
+    3. Ask a relevant follow-up question.
+    4. Provide a "MASTERCLASS" example answer.
     
     OUTPUT JSON (STRICT):
     {{
-        "coach_response_text": "Your next question (max 2 sentences).",
+        "coach_response_text": "Your question (max 2 sentences).",
         "transcription_user": "What you heard.",
         "score_pronunciation": (0-10),
         "feedback_grammar": "Correction.",
-        "better_response_example": "The perfect 'Masterclass' answer.",
-        "next_step_advice": "Short tip."
+        "better_response_example": "The Masterclass answer.",
+        "next_step_advice": "Tip."
     }}
     """
 
@@ -226,41 +234,46 @@ def start_chat():
 @app.route('/analyze', methods=['POST'])
 @login_required
 def analyze():
+    # 1. RÉCEPTION
     logger.info(">>> ANALYZE START")
     if not current_user.is_paid: return jsonify({"error": "Pay first"}), 403
     
     sid = request.form.get('session_id')
+    mime_type = request.form.get('mime_type', '')
     f = request.files.get('audio')
     
     if not f: return jsonify({"error": "No audio"}), 400
     
-    # SAUVEGARDE EN WEBM PAR DEFAUT
-    raw_audio = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
-    mp3_audio = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    # 2. DÉTECTION EXTENSION (CRUCIAL POUR FFMPEG)
+    ext = ".webm"
+    if "mp4" in mime_type or "aac" in mime_type: ext = ".mp4"
+    if "mpeg" in mime_type: ext = ".mp3"
+    
+    # Noms de fichiers temporaires
+    raw_filename = f"input_{uuid.uuid4().hex}{ext}"
+    mp3_filename = f"output_{uuid.uuid4().hex}.mp3"
     
     try:
-        f.save(raw_audio.name)
-        raw_audio.close()
+        f.save(raw_filename)
         
-        # VERIFICATION TAILLE
-        if os.path.getsize(raw_audio.name) < 500:
-            return jsonify({"error": "Audio too short/empty"}), 400
+        file_size = os.path.getsize(raw_filename)
+        logger.info(f"File saved: {raw_filename}, Size: {file_size}, Mime: {mime_type}")
+        
+        if file_size < 500: return jsonify({"error": "Audio empty"}), 400
 
-        # CONVERSION AUDIO (La clé de la réussite)
-        logger.info(">>> CONVERTING AUDIO")
+        # 3. CONVERSION FFMPEG VERS MP3 (POUR GEMINI)
+        logger.info(">>> STARTING CONVERSION")
         try:
-            # On laisse pydub détecter le format (webm ou mp4)
-            sound = AudioSegment.from_file(raw_audio.name)
-            sound = sound.set_frame_rate(16000).set_channels(1)
-            sound.export(mp3_audio.name, format="mp3")
+            # On force la conversion en MP3 Mono 16k
+            audio = AudioSegment.from_file(raw_filename)
+            audio = audio.set_frame_rate(16000).set_channels(1)
+            audio.export(mp3_filename, format="mp3")
+            logger.info(">>> CONVERSION SUCCESS")
         except Exception as e:
             logger.error(f"FFMPEG ERROR: {e}")
-            # Si la conversion échoue, on retourne une erreur claire (pas 500 crash)
-            return jsonify({"error": "Audio format invalid. Try Chrome."}), 400
-        
-        mp3_audio.close()
+            return jsonify({"error": "Audio format error (FFmpeg)"}), 400
 
-        # RECUPERATION CONTEXTE
+        # 4. CONTEXTE
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
@@ -268,59 +281,52 @@ def analyze():
         cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC LIMIT 10", (sid,))
         rows = cur.fetchall()
         conn.close()
+        
         hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
         
-        # APPEL GEMINI
+        # 5. GEMINI (Modèle 1.5 Flash)
         sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
         
-        # BLINDAGE VERSION GEMINI
-        try:
-            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
-        except TypeError as e:
-            logger.error(f"OLD GEMINI VERSION DETECTED: {e}")
-            # Fallback pour vieille version (ne devrait pas arriver si cache vidé)
-            model = genai.GenerativeModel("gemini-1.5-flash") 
-        
+        # NOTE: On utilise 1.5-flash car 2.5 n'existe pas encore. 
+        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
         
-        uf = genai.upload_file(mp3_audio.name, mime_type="audio/mp3")
-        while uf.state.name == "PROCESSING": time.sleep(0.5); uf = genai.get_file(uf.name)
+        uf = genai.upload_file(mp3_filename, mime_type="audio/mp3")
         
-        if uf.state.name == "FAILED": raise Exception("Gemini refused audio")
+        # Attente
+        for _ in range(10):
+            if uf.state.name == "ACTIVE": break
+            if uf.state.name == "FAILED": raise Exception("Gemini refused audio")
+            time.sleep(0.5)
+            uf = genai.get_file(uf.name)
 
         resp = chat.send_message([uf, "Analyze this."], generation_config={"response_mime_type": "application/json"})
         
         try:
             data = json.loads(resp.text.replace('```json','').replace('```','').strip())
         except:
-            data = {"coach_response_text": "I understood. Continue.", "transcription_user": "(...)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": ""}
+            data = {"coach_response_text": "I understood. Go on.", "transcription_user": "(...)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": "Continue."}
 
-        # SAUVEGARDE
+        # 6. SAVE & RETURN
         conn = get_db_connection(); cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
                    (sid, data.get('transcription_user', ''), sid, data.get('coach_response_text', '')))
         conn.commit(); conn.close()
         
+        # Voix Edge TTS
         data['audio_base64'] = generate_tts(data.get('coach_response_text', ''))
         return jsonify(data)
 
     except Exception as e:
-        logger.error(f"CRITICAL ERROR: {str(e)}")
-        # RENVOIE UNE REPONSE JSON (PAS 500)
-        return jsonify({
-            "coach_response_text": "Technical glitch. Can you repeat?",
-            "transcription_user": "(Error)",
-            "score_pronunciation": 0,
-            "feedback_grammar": "System Error",
-            "better_response_example": "N/A",
-            "next_step_advice": "Retry"
-        })
+        logger.error(f"CRITICAL: {str(e)}")
+        return jsonify({"error": str(e)}), 500
         
     finally:
-        if os.path.exists(raw_audio.name): os.remove(raw_audio.name)
-        if os.path.exists(mp3_audio.name): os.remove(mp3_audio.name)
+        # Nettoyage
+        if os.path.exists(raw_filename): os.remove(raw_filename)
+        if os.path.exists(mp3_filename): os.remove(mp3_filename)
 
-# --- PAYMENT & PROMO ---
+# --- PAYMENT ---
 @app.route('/api/payment_success', methods=['POST'])
 @login_required
 def pay_ok():
