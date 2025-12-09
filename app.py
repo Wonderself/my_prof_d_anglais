@@ -236,7 +236,6 @@ def analyze():
     if not f: return jsonify({"error": "No audio"}), 400
     
     # 2. SAUVEGARDE UNIVERSELLE (SANS EXTENSION AU DÉBUT)
-    # On utilise un fichier temporaire neutre pour laisser FFmpeg deviner le format
     raw_audio = tempfile.NamedTemporaryFile(delete=False)
     mp3_audio = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
     
@@ -245,22 +244,17 @@ def analyze():
         raw_audio.close() # Close handle
         
         file_size = os.path.getsize(raw_audio.name)
-        logger.info(f"Audio received: {file_size} bytes")
         
         if file_size < 500: return jsonify({"error": "Audio too short"}), 400
 
         # 3. LA LESSIVEUSE (CONVERSION FORCEE EN MP3)
-        # On ne précise pas le format d'entrée (from_file sans format), pydub va sniffer le header
-        # C'est ça qui sauve la mise pour l'iPhone (qui envoie du mp4 déguisé)
-        logger.info(">>> STARTING CONVERSION (AUTO DETECT)")
         try:
             sound = AudioSegment.from_file(raw_audio.name)
             sound = sound.set_frame_rate(16000).set_channels(1) # Standardisation
             sound.export(mp3_audio.name, format="mp3")
-            logger.info(">>> CONVERSION SUCCESS")
         except Exception as e:
             logger.error(f"FFMPEG ERROR: {e}")
-            return jsonify({"error": "Audio format not supported. Try Chrome/Safari."}), 400
+            return jsonify({"error": "Audio format error"}), 400
         
         mp3_audio.close()
 
@@ -276,6 +270,7 @@ def analyze():
         hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
         
         # 5. GEMINI
+        # AVEC LA VERSION 0.5.0+, CELA NE PLANTERA PLUS
         sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
