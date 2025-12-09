@@ -47,10 +47,11 @@
     <div id="payment-screen" class="fixed inset-0 bg-white z-40 overflow-y-auto hidden">
         <div class="max-w-2xl mx-auto px-6 py-12 md:py-20 text-center fade-in">
             <h2 class="text-xs font-bold text-blue-600 tracking-widest uppercase mb-4">Pro Access</h2>
-            <h1 class="4xl md:text-5xl font-bold text-[#1d1d1f] mb-6 leading-tight">Your career upgrade.<br>For the price of a coffee.</h1>
+            <h1 class="text-4xl md:text-5xl font-bold text-[#1d1d1f] mb-6 leading-tight">Your career upgrade.<br>For the price of a coffee.</h1>
             <div class="bg-white border border-slate-100 shadow-xl rounded-3xl p-8 max-w-sm mx-auto relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
                 <div class="text-3xl font-bold mb-1">€9.99</div>
+                <div class="text-sm text-gray-400 mb-6">One-time payment.</div>
                 <div id="paypal-button-container" class="mb-4"></div>
                 <div class="flex gap-2 mb-4">
                     <input id="promo-code" type="text" placeholder="Promo Code" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm w-full outline-none focus:border-blue-500">
@@ -217,6 +218,7 @@
         }
 
         async function startRec() {
+            // STOP IA SI ELLE PARLE (BARGE-IN)
             if(currentAudio) { currentAudio.pause(); currentAudio = null; }
             avatar.src = "/idle.mp4"; avatar.play();
 
@@ -245,19 +247,17 @@
             mediaRecorder.onstop = async () => {
                 const mimeType = mediaRecorder.mimeType;
                 const blob = new Blob(audioChunks, { type: mimeType });
-                
                 if (blob.size < 500) { statusTxt.innerText = "Too short"; return; }
                 
                 const fd = new FormData(); 
                 fd.append('audio', blob); 
                 fd.append('session_id', sessionId);
-                fd.append('mime_type', mimeType); // AJOUT CRUCIAL pour le backend
+                fd.append('mime_type', mimeType); 
                 
                 try {
                     addMessage('user', '...'); 
                     const res = await fetch('/analyze', {method: 'POST', body: fd});
                     const d = await res.json();
-                    
                     if (d.error) throw new Error(d.error);
 
                     document.querySelector('.bubble-user:last-child').innerText = d.transcription_user;

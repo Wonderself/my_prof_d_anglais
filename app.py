@@ -81,6 +81,7 @@ def init_tables():
         try: cur.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
         except: conn.rollback()
         conn.commit(); conn.close()
+        logger.info(">>> DB TABLES READY")
     except Exception as e: logger.error(f"DB INIT ERROR: {e}")
 
 @app.before_request
@@ -107,55 +108,70 @@ def load_user(user_id):
     except: pass
     return None
 
-# --- TTS (EDGE - MEILLEURE QUALITÉ) ---
+# --- TTS HYBRIDE (EDGE-TTS NEURAL + GOOGLE FALLBACK) ---
 def generate_tts(text):
-    """Génère une voix Neural de haute qualité via Edge TTS"""
+    if not text: return None
+    clean_text = text.replace('"', '').replace("'", "").replace("\n", " ")[:1000]
+    
+    # 1. Tentative Edge TTS (Voix Aria Neural - Top Qualité)
     try:
-        if not text: return None
-        clean_text = text.replace('"', '').replace("'", "").replace("\n", " ")[:1000]
         unique_name = f"tts_{uuid.uuid4().hex}.mp3"
-        
-        # Appel système pour Edge TTS (Voix Aria = Top Qualité)
+        # On utilise subprocess pour éviter les conflits async de Flask
         cmd = ["edge-tts", "--voice", "en-US-AriaNeural", "--text", clean_text, "--write-media", unique_name]
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, timeout=10) # 10s timeout
         
         with open(unique_name, "rb") as f:
             audio_data = base64.b64encode(f.read()).decode('utf-8')
         os.remove(unique_name)
         return audio_data
     except Exception as e:
-        logger.error(f"TTS ERROR: {e}")
-        return None
+        logger.error(f"EDGE TTS FAILED: {e} - Switching to Fallback")
 
-def get_ai_prompt(name, job, company, cv, history_len):
-    stage = "INTRODUCTION"
-    if history_len >= 2: stage = "EXPERIENCE DEEP DIVE"
-    if history_len >= 6: stage = "CHALLENGE"
-    if history_len >= 10: stage = "CLOSING"
+    # 2. Fallback Google Translate (Qualité Standard mais Robuste)
+    try:
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(clean_text)}"
+        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+        if r.status_code == 200:
+            return base64.b64encode(r.content).decode('utf-8')
+    except Exception as e:
+        logger.error(f"TTS FALLBACK FAILED: {e}")
+        
+    return None
 
-    cv_text = cv[:8000] if cv else "NO CV PROVIDED."
-    
+# --- PROMPTS ---
+def get_intro_prompt(name, job, company, cv):
+    cv_txt = cv[:3000] if cv else "No CV provided."
+    # INSTRUCTION STRICTE : NE PAS GENERER LA REPONSE DU CANDIDAT
     return f"""
-    ROLE: You are an expert recruiter at {company}. Interviewing {name} for {job}.
-    TONE: Professional, concise, challenging but fair. Spoken English.
-    STAGE: {stage}
-    MODEL_NAME: GEMINI 2.5 FLASH
-    CANDIDATE CV: "{cv_text}"
+    You are an expert tech recruiter at {company}.
+    Candidate: {name} for {job}.
+    CV Context: "{cv_txt}"
+    
+    TASK: Generate ONLY a short opening greeting and ONE introductory question based on the CV.
+    IMPORTANT: Do NOT write a dialogue. Do NOT write the candidate's answer. Just speak as the recruiter.
+    Keep it under 20 words.
+    """
+
+def get_analysis_prompt(name, job, company, cv):
+    cv_txt = cv[:6000] if cv else "No CV."
+    return f"""
+    ROLE: Expert Recruiter at {company}. Interviewing {name} for {job}.
+    CV: "{cv_txt}"
     
     INSTRUCTIONS:
-    1. Listen to the audio.
-    2. Check consistency with CV.
-    3. Ask a FOLLOW-UP question based on the CV. Do NOT ask generic questions.
-    4. Create a "MASTERCLASS" example answer.
+    1. ANALYZE the candidate's audio answer.
+    2. CHECK consistency with the CV provided.
+    3. ASK the next logical question (dig deeper into experience or soft skills).
+    4. PROVIDE a "MASTERCLASS" example: The perfect answer a top candidate would have given.
     
     OUTPUT JSON (STRICT):
     {{
         "coach_response_text": "Your next question (max 2 sentences).",
         "transcription_user": "What you heard.",
-        "score_pronunciation": (0-10),
-        "feedback_grammar": "Correction of any mistake.",
-        "better_response_example": "The perfect 'Masterclass' answer.",
-        "next_step_advice": "Short tip."
+        "score_pronunciation": (0-10 integer),
+        "feedback_grammar": "Correction of mistakes.",
+        "better_response_example": "The Masterclass Answer (hidden by default).",
+        "next_step_advice": "A short strategic tip."
     }}
     """
 
@@ -188,9 +204,7 @@ def authorize():
         conn.commit(); conn.close()
         login_user(User(u['id'], u['email'], u['name'], u['cv_content'], u['sub_expires']))
         return redirect('/')
-    except Exception as e: 
-        logger.error(f"AUTH FAIL: {e}")
-        return f"AUTH ERROR: {str(e)}"
+    except Exception as e: return f"AUTH ERROR: {str(e)}"
 
 @app.route('/logout')
 @login_required
@@ -229,22 +243,22 @@ def start_chat():
                (d.get('session_id'), current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), final_cv))
     conn.commit(); conn.close()
     
-    # NOTE: On utilise le modèle 2.5 Flash ici aussi
-    msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter for {d.get('company_type')}. I have your CV. Please introduce yourself."
+    # GENERATION INTRO (1.5 Flash est la version rapide officielle)
+    prompt = get_intro_prompt(d.get('candidate_name'), d.get('job_title'), d.get('company_type'), final_cv)
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash") 
-        resp = model.generate_content(msg)
-        msg = resp.text
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        resp = model.generate_content(prompt)
+        msg = resp.text.strip()
     except Exception as e:
-        logger.error(f"Initial Prompt Error: {e}")
-        msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter. Tell me about yourself."
+        logger.error(f"INTRO FAIL: {e}")
+        msg = f"Hello {d.get('candidate_name')}. I'm ready to interview you. Please introduce yourself."
         
     return jsonify({"coach_response_text": msg, "audio_base64": generate_tts(msg)})
 
 @app.route('/analyze', methods=['POST'])
 @login_required
 def analyze():
-    # 1. RÉCEPTION
+    # 1. VERIFS
     logger.info(">>> ANALYZE START")
     if not current_user.is_paid: return jsonify({"error": "Pay first"}), 403
     
@@ -254,41 +268,29 @@ def analyze():
     
     if not f: return jsonify({"error": "No audio"}), 400
     
-    # 2. DÉTECTION EXTENSION & NOMMAGE
+    # 2. FICHIERS TEMP (Avec Extensions)
     ext = ".webm"
     if "mp4" in mime_type or "aac" in mime_type: ext = ".mp4"
-    if "mpeg" in mime_type: ext = ".mp3"
     
-    raw_filename = f"input_{uuid.uuid4().hex}{ext}"
-    mp3_filename = f"output_{uuid.uuid4().hex}.mp3"
+    raw_filename = f"in_{uuid.uuid4().hex}{ext}"
+    mp3_filename = f"out_{uuid.uuid4().hex}.mp3"
     
     try:
         f.save(raw_filename)
         
-        file_size = os.path.getsize(raw_filename)
-        logger.info(f"File saved: {raw_filename}, Size: {file_size}, Mime: {mime_type}")
-        
-        # CRITIQUE: VÉRIFICATION AUDIO RÉEL
-        if file_size < 500: return jsonify({"error": "Audio too short (less than 500 bytes)"}), 400
-
-        # 3. CONVERSION FFMPEG VERS MP3
-        logger.info(">>> STARTING CONVERSION")
+        # 3. CONVERSION AUDIO
         try:
-            # Conversion forcée: résout le problème iPhone/Safari
-            audio = AudioSegment.from_file(raw_filename)
-            # CRITIQUE: Si la durée est zéro, on refuse
-            if len(audio) < 500:
-                logger.error("AUDIO DURATION TOO SHORT (< 0.5s)")
-                return jsonify({"error": "Audio too short (silent)"}), 400
-                
-            audio = audio.set_frame_rate(16000).set_channels(1)
-            audio.export(mp3_filename, format="mp3")
-            logger.info(">>> CONVERSION SUCCESS")
+            sound = AudioSegment.from_file(raw_filename)
+            # Check Silence
+            if len(sound) < 500: return jsonify({"error": "Audio silent/short"}), 400
+            
+            sound = sound.set_frame_rate(16000).set_channels(1)
+            sound.export(mp3_filename, format="mp3")
         except Exception as e:
-            logger.error(f"FFMPEG CONVERSION FAILED: {e}")
-            return jsonify({"error": "Audio format error (FFmpeg)"}), 400
+            logger.error(f"CONVERT ERROR: {e}")
+            return jsonify({"error": "Audio format error"}), 400
 
-        # 4. CONTEXTE
+        # 4. CONTEXTE (10 derniers échanges seulement)
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT * FROM sessions WHERE session_id=%s", (sid,))
@@ -296,29 +298,29 @@ def analyze():
         cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC LIMIT 10", (sid,))
         rows = cur.fetchall()
         conn.close()
+        
         hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
         
-        # 5. GEMINI (2.5 Flash)
-        sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
-        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=sys_instr)
+        # 5. GEMINI
+        sys_instr = get_analysis_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'])
+        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
         
         uf = genai.upload_file(mp3_filename, mime_type="audio/mp3")
-        
         for _ in range(10):
             if uf.state.name == "ACTIVE": break
-            if uf.state.name == "FAILED": raise Exception("Gemini refused audio")
+            if uf.state.name == "FAILED": raise Exception("Gemini Audio Error")
             time.sleep(0.5)
             uf = genai.get_file(uf.name)
 
-        resp = chat.send_message([uf, "Analyze this answer."], generation_config={"response_mime_type": "application/json"})
+        resp = chat.send_message([uf, "Analyze."], generation_config={"response_mime_type": "application/json"})
         
         try:
             data = json.loads(resp.text.replace('```json','').replace('```','').strip())
         except:
-            data = {"coach_response_text": "I understood. Go on.", "transcription_user": "(...)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": "Continue."}
+            data = {"coach_response_text": "I heard you. Next question.", "transcription_user": "(...)", "score_pronunciation": 6, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": ""}
 
-        # 6. SAVE & RETURN
+        # 6. SAVE
         conn = get_db_connection(); cur = conn.cursor()
         cur.execute("INSERT INTO history (session_id, role, content) VALUES (%s, 'user', %s), (%s, 'model', %s)", 
                    (sid, data.get('transcription_user', ''), sid, data.get('coach_response_text', '')))
@@ -328,8 +330,7 @@ def analyze():
         return jsonify(data)
 
     except Exception as e:
-        logger.error(f"CRITICAL UNHANDLED ERROR: {str(e)}")
-        # Renvoie 500 pour que le front sache que c'est une erreur grave
+        logger.error(f"CRITICAL: {str(e)}")
         return jsonify({"error": str(e)}), 500
         
     finally:
