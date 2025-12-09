@@ -107,15 +107,25 @@ def load_user(user_id):
     except: pass
     return None
 
-# --- TTS (RETOUR AU HACK SIMPLE ET FIABLE) ---
+# --- TTS (EDGE - MEILLEURE QUALITÉ) ---
 def generate_tts(text):
-    """Génère une voix simple via le hack Google Translate"""
+    """Génère une voix Neural de haute qualité via Edge TTS"""
     try:
-        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:900])}"
-        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-        if r.status_code == 200: return base64.b64encode(r.content).decode('utf-8')
-    except: pass
-    return None
+        if not text: return None
+        clean_text = text.replace('"', '').replace("'", "").replace("\n", " ")[:1000]
+        unique_name = f"tts_{uuid.uuid4().hex}.mp3"
+        
+        # Appel système pour Edge TTS (Voix Aria = Top Qualité)
+        cmd = ["edge-tts", "--voice", "en-US-AriaNeural", "--text", clean_text, "--write-media", unique_name]
+        subprocess.run(cmd, check=True)
+        
+        with open(unique_name, "rb") as f:
+            audio_data = base64.b64encode(f.read()).decode('utf-8')
+        os.remove(unique_name)
+        return audio_data
+    except Exception as e:
+        logger.error(f"TTS ERROR: {e}")
+        return None
 
 def get_ai_prompt(name, job, company, cv, history_len):
     stage = "INTRODUCTION"
@@ -129,6 +139,7 @@ def get_ai_prompt(name, job, company, cv, history_len):
     ROLE: You are an expert recruiter at {company}. Interviewing {name} for {job}.
     TONE: Professional, concise, challenging but fair. Spoken English.
     STAGE: {stage}
+    MODEL_NAME: GEMINI 2.5 FLASH
     CANDIDATE CV: "{cv_text}"
     
     INSTRUCTIONS:
@@ -144,7 +155,7 @@ def get_ai_prompt(name, job, company, cv, history_len):
         "score_pronunciation": (0-10),
         "feedback_grammar": "Correction of any mistake.",
         "better_response_example": "The perfect 'Masterclass' answer.",
-        "next_step_advice": "A short strategic tip."
+        "next_step_advice": "Short tip."
     }}
     """
 
@@ -218,7 +229,16 @@ def start_chat():
                (d.get('session_id'), current_user.id, d.get('candidate_name'), d.get('job_title'), d.get('company_type'), final_cv))
     conn.commit(); conn.close()
     
+    # NOTE: On utilise le modèle 2.5 Flash ici aussi
     msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter for {d.get('company_type')}. I have your CV. Please introduce yourself."
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash") 
+        resp = model.generate_content(msg)
+        msg = resp.text
+    except Exception as e:
+        logger.error(f"Initial Prompt Error: {e}")
+        msg = f"Hello {d.get('candidate_name')}. I'm the AI Recruiter. Tell me about yourself."
+        
     return jsonify({"coach_response_text": msg, "audio_base64": generate_tts(msg)})
 
 @app.route('/analyze', methods=['POST'])
@@ -229,17 +249,16 @@ def analyze():
     if not current_user.is_paid: return jsonify({"error": "Pay first"}), 403
     
     sid = request.form.get('session_id')
-    mime_type = request.form.get('mime_type', '') 
+    mime_type = request.form.get('mime_type', '')
     f = request.files.get('audio')
     
     if not f: return jsonify({"error": "No audio"}), 400
     
-    # 2. DÉTECTION EXTENSION & FICHIER TEMP
+    # 2. DÉTECTION EXTENSION & NOMMAGE
     ext = ".webm"
     if "mp4" in mime_type or "aac" in mime_type: ext = ".mp4"
     if "mpeg" in mime_type: ext = ".mp3"
     
-    # Création de noms uniques pour le nettoyage
     raw_filename = f"input_{uuid.uuid4().hex}{ext}"
     mp3_filename = f"output_{uuid.uuid4().hex}.mp3"
     
@@ -249,20 +268,26 @@ def analyze():
         file_size = os.path.getsize(raw_filename)
         logger.info(f"File saved: {raw_filename}, Size: {file_size}, Mime: {mime_type}")
         
-        if file_size < 500: return jsonify({"error": "Audio empty"}), 400
+        # CRITIQUE: VÉRIFICATION AUDIO RÉEL
+        if file_size < 500: return jsonify({"error": "Audio too short (less than 500 bytes)"}), 400
 
         # 3. CONVERSION FFMPEG VERS MP3
         logger.info(">>> STARTING CONVERSION")
         try:
-            # On laisse pydub sniffer le header grâce à l'extension
-            sound = AudioSegment.from_file(raw_filename)
-            sound = sound.set_frame_rate(16000).set_channels(1)
-            sound.export(mp3_filename, format="mp3")
+            # Conversion forcée: résout le problème iPhone/Safari
+            audio = AudioSegment.from_file(raw_filename)
+            # CRITIQUE: Si la durée est zéro, on refuse
+            if len(audio) < 500:
+                logger.error("AUDIO DURATION TOO SHORT (< 0.5s)")
+                return jsonify({"error": "Audio too short (silent)"}), 400
+                
+            audio = audio.set_frame_rate(16000).set_channels(1)
+            audio.export(mp3_filename, format="mp3")
             logger.info(">>> CONVERSION SUCCESS")
         except Exception as e:
-            logger.error(f"FFMPEG CONVERSION ERROR: {e}")
+            logger.error(f"FFMPEG CONVERSION FAILED: {e}")
             return jsonify({"error": "Audio format error (FFmpeg)"}), 400
-        
+
         # 4. CONTEXTE
         conn = get_db_connection()
         cur = conn.cursor()
@@ -271,14 +296,11 @@ def analyze():
         cur.execute("SELECT role, content FROM history WHERE session_id=%s ORDER BY id ASC LIMIT 10", (sid,))
         rows = cur.fetchall()
         conn.close()
-        
         hist = [{"role": r['role'], "parts": [r['content']]} for r in rows]
         
-        # 5. GEMINI (Modèle 1.5 Flash)
+        # 5. GEMINI (2.5 Flash)
         sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
-        
-        # NOTE: system_instruction est supporté si la librairie est à jour
-        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
+        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
         
         uf = genai.upload_file(mp3_filename, mime_type="audio/mp3")
@@ -294,7 +316,7 @@ def analyze():
         try:
             data = json.loads(resp.text.replace('```json','').replace('```','').strip())
         except:
-            data = {"coach_response_text": "I understood. Continue.", "transcription_user": "(...)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": "Continue."}
+            data = {"coach_response_text": "I understood. Go on.", "transcription_user": "(...)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": "Continue."}
 
         # 6. SAVE & RETURN
         conn = get_db_connection(); cur = conn.cursor()
@@ -306,7 +328,8 @@ def analyze():
         return jsonify(data)
 
     except Exception as e:
-        logger.error(f"CRITICAL: {str(e)}")
+        logger.error(f"CRITICAL UNHANDLED ERROR: {str(e)}")
+        # Renvoie 500 pour que le front sache que c'est une erreur grave
         return jsonify({"error": str(e)}), 500
         
     finally:
