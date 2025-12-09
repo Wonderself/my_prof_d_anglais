@@ -107,25 +107,15 @@ def load_user(user_id):
     except: pass
     return None
 
-# --- TTS (EDGE - MEILLEURE QUALITÉ) ---
+# --- TTS (RETOUR AU HACK SIMPLE ET FIABLE) ---
 def generate_tts(text):
+    """Génère une voix simple via le hack Google Translate"""
     try:
-        if not text: return None
-        clean_text = text.replace('"', '').replace("'", "").replace("\n", " ")[:1000]
-        # Nom de fichier unique pour éviter les conflits
-        unique_name = f"tts_{uuid.uuid4().hex}.mp3"
-        
-        # Appel système pour Edge TTS (Voix Aria = Top Qualité)
-        cmd = ["edge-tts", "--voice", "en-US-AriaNeural", "--text", clean_text, "--write-media", unique_name]
-        subprocess.run(cmd, check=True)
-        
-        with open(unique_name, "rb") as f:
-            audio_data = base64.b64encode(f.read()).decode('utf-8')
-        os.remove(unique_name)
-        return audio_data
-    except Exception as e:
-        logger.error(f"TTS ERROR: {e}")
-        return None
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q={quote(text[:900])}"
+        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+        if r.status_code == 200: return base64.b64encode(r.content).decode('utf-8')
+    except: pass
+    return None
 
 def get_ai_prompt(name, job, company, cv, history_len):
     stage = "INTRODUCTION"
@@ -137,24 +127,24 @@ def get_ai_prompt(name, job, company, cv, history_len):
     
     return f"""
     ROLE: You are an expert recruiter at {company}. Interviewing {name} for {job}.
-    TONE: Professional, concise, fair but tough. Spoken English.
+    TONE: Professional, concise, challenging but fair. Spoken English.
     STAGE: {stage}
     CANDIDATE CV: "{cv_text}"
     
-    MISSION:
+    INSTRUCTIONS:
     1. Listen to the audio.
     2. Check consistency with CV.
-    3. Ask a relevant follow-up question.
-    4. Provide a "MASTERCLASS" example answer.
+    3. Ask a FOLLOW-UP question based on the CV. Do NOT ask generic questions.
+    4. Create a "MASTERCLASS" example answer.
     
     OUTPUT JSON (STRICT):
     {{
-        "coach_response_text": "Your question (max 2 sentences).",
+        "coach_response_text": "Your next question (max 2 sentences).",
         "transcription_user": "What you heard.",
         "score_pronunciation": (0-10),
-        "feedback_grammar": "Correction.",
-        "better_response_example": "The Masterclass answer.",
-        "next_step_advice": "Tip."
+        "feedback_grammar": "Correction of any mistake.",
+        "better_response_example": "The perfect 'Masterclass' answer.",
+        "next_step_advice": "A short strategic tip."
     }}
     """
 
@@ -239,17 +229,17 @@ def analyze():
     if not current_user.is_paid: return jsonify({"error": "Pay first"}), 403
     
     sid = request.form.get('session_id')
-    mime_type = request.form.get('mime_type', '')
+    mime_type = request.form.get('mime_type', '') 
     f = request.files.get('audio')
     
     if not f: return jsonify({"error": "No audio"}), 400
     
-    # 2. DÉTECTION EXTENSION (CRUCIAL POUR FFMPEG)
+    # 2. DÉTECTION EXTENSION & FICHIER TEMP
     ext = ".webm"
     if "mp4" in mime_type or "aac" in mime_type: ext = ".mp4"
     if "mpeg" in mime_type: ext = ".mp3"
     
-    # Noms de fichiers temporaires
+    # Création de noms uniques pour le nettoyage
     raw_filename = f"input_{uuid.uuid4().hex}{ext}"
     mp3_filename = f"output_{uuid.uuid4().hex}.mp3"
     
@@ -261,18 +251,18 @@ def analyze():
         
         if file_size < 500: return jsonify({"error": "Audio empty"}), 400
 
-        # 3. CONVERSION FFMPEG VERS MP3 (POUR GEMINI)
+        # 3. CONVERSION FFMPEG VERS MP3
         logger.info(">>> STARTING CONVERSION")
         try:
-            # On force la conversion en MP3 Mono 16k
-            audio = AudioSegment.from_file(raw_filename)
-            audio = audio.set_frame_rate(16000).set_channels(1)
-            audio.export(mp3_filename, format="mp3")
+            # On laisse pydub sniffer le header grâce à l'extension
+            sound = AudioSegment.from_file(raw_filename)
+            sound = sound.set_frame_rate(16000).set_channels(1)
+            sound.export(mp3_filename, format="mp3")
             logger.info(">>> CONVERSION SUCCESS")
         except Exception as e:
-            logger.error(f"FFMPEG ERROR: {e}")
+            logger.error(f"FFMPEG CONVERSION ERROR: {e}")
             return jsonify({"error": "Audio format error (FFmpeg)"}), 400
-
+        
         # 4. CONTEXTE
         conn = get_db_connection()
         cur = conn.cursor()
@@ -287,25 +277,24 @@ def analyze():
         # 5. GEMINI (Modèle 1.5 Flash)
         sys_instr = get_ai_prompt(sess['candidate_name'], sess['job_title'], sess['company_type'], sess['cv_content'], len(rows))
         
-        # NOTE: On utilise 1.5-flash car 2.5 n'existe pas encore. 
+        # NOTE: system_instruction est supporté si la librairie est à jour
         model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys_instr)
         chat = model.start_chat(history=hist)
         
         uf = genai.upload_file(mp3_filename, mime_type="audio/mp3")
         
-        # Attente
         for _ in range(10):
             if uf.state.name == "ACTIVE": break
             if uf.state.name == "FAILED": raise Exception("Gemini refused audio")
             time.sleep(0.5)
             uf = genai.get_file(uf.name)
 
-        resp = chat.send_message([uf, "Analyze this."], generation_config={"response_mime_type": "application/json"})
+        resp = chat.send_message([uf, "Analyze this answer."], generation_config={"response_mime_type": "application/json"})
         
         try:
             data = json.loads(resp.text.replace('```json','').replace('```','').strip())
         except:
-            data = {"coach_response_text": "I understood. Go on.", "transcription_user": "(...)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": "Continue."}
+            data = {"coach_response_text": "I understood. Continue.", "transcription_user": "(...)", "score_pronunciation": 7, "feedback_grammar": "", "better_response_example": "N/A", "next_step_advice": "Continue."}
 
         # 6. SAVE & RETURN
         conn = get_db_connection(); cur = conn.cursor()
@@ -313,7 +302,6 @@ def analyze():
                    (sid, data.get('transcription_user', ''), sid, data.get('coach_response_text', '')))
         conn.commit(); conn.close()
         
-        # Voix Edge TTS
         data['audio_base64'] = generate_tts(data.get('coach_response_text', ''))
         return jsonify(data)
 
@@ -322,7 +310,6 @@ def analyze():
         return jsonify({"error": str(e)}), 500
         
     finally:
-        # Nettoyage
         if os.path.exists(raw_filename): os.remove(raw_filename)
         if os.path.exists(mp3_filename): os.remove(mp3_filename)
 
