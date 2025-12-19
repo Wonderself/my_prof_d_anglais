@@ -1,10 +1,7 @@
-# Fichiers de configuration sensibles
 .env
-
-# Fichiers Python générés
+.env.local
 __pycache__/
 *.pyc
-
-# Environnement virtuel (Venv)
+.DS_Store
 venv/
 .venv/

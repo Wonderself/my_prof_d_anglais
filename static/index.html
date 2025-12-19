@@ -1,276 +1,2421 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Job ITV Simulator</title>
-    <link rel="icon" href="/fav.png" type="image/png">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Infinity Coach - Master any skill with AI-powered personal coaching">
+    <meta name="theme-color" content="#3b82f6">
+    <title>Infinity Coach - AI Personal Coaching</title>
+    <link rel="icon" href="/static/fav.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://www.paypal.com/sdk/js?client-id=AVaXhjiQjRN4YKxQnkh1jBWfgWDNjA23YLd3SAUGPBDlDyjOeswmF1D0n0LnyniKbLa_HkZGB9vXAHuv&currency=EUR"></script>
-
+    <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=EUR"></script>
+    <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#3b82f6',accent:'#60a5fa'}}}}</script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        :root { --primary: #0071e3; --bg: #f5f5f7; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; color: #1d1d1f; }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .bubble { max-width: 85%; padding: 14px 18px; font-size: 15px; line-height: 1.5; position: relative; word-wrap: break-word; }
-        .bubble-coach { background: #fff; border-radius: 18px 18px 18px 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #1d1d1f; margin-right: auto; }
-        .bubble-user { background: #0071e3; border-radius: 18px 18px 4px 18px; color: white; margin-left: auto; }
-        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.4); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .blur-reveal { filter: blur(6px); cursor: pointer; transition: all 0.3s ease; user-select: none; }
-        .blur-reveal:hover { filter: blur(3px); }
-        .blur-reveal.revealed { filter: blur(0); cursor: text; user-select: text; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+        html,body{height:100%;overflow-x:hidden}
+        
+        /* Theme */
+        body{background:#0a0a12;color:#f1f5f9}
+        
+        /* Glass */
+        .glass{background:rgba(20,20,35,.85);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(20px)}
+        .glass-strong{background:rgba(10,10,20,.95);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(30px)}
+        
+        /* Cards */
+        .card{background:linear-gradient(165deg,rgba(25,25,40,.9),rgba(15,15,25,.95));border:1px solid rgba(255,255,255,.06);border-radius:16px;transition:all .3s}
+        .card:hover{border-color:rgba(59,130,246,.5);box-shadow:0 20px 40px -15px rgba(59,130,246,.2)}
+        .card.selected{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.3)}
+        
+        /* Inputs */
+        select,input,textarea{background:rgba(30,30,50,.8);color:#fff;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 16px;outline:none;transition:border .2s}
+        select:focus,input:focus,textarea:focus{border-color:#3b82f6}
+        
+        /* Buttons */
+        .btn-primary{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-weight:600;padding:14px 28px;border-radius:14px;border:none;cursor:pointer;transition:all .2s;box-shadow:0 4px 15px rgba(59,130,246,.3)}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(59,130,246,.4)}
+        .btn-secondary{background:rgba(59,130,246,.1);color:#60a5fa;font-weight:600;padding:14px 28px;border-radius:14px;border:1px solid rgba(59,130,246,.3);cursor:pointer;transition:all .2s}
+        .btn-secondary:hover{background:rgba(59,130,246,.2)}
+        
+        /* Bubbles */
+        .bubble{padding:14px 20px;border-radius:20px;max-width:85%;line-height:1.6;animation:fadeIn .3s}
+        .bubble-user{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;margin-left:auto;border-bottom-right-radius:6px}
+        .bubble-coach{background:rgba(30,30,50,.9);border:1px solid rgba(255,255,255,.08);border-bottom-left-radius:6px}
+        
+        /* Mic Button */
+        .mic-btn{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#2563eb);box-shadow:0 8px 30px rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;cursor:pointer;border:none;transition:all .2s}
+        .mic-btn:hover{transform:scale(1.05)}
+        .mic-btn.active{animation:pulse 1.5s infinite;background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 8px 30px rgba(239,68,68,.5)}
+        
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        
+        /* Speed buttons */
+        .speed-btn{padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.05);color:#94a3b8;border:none}
+        .speed-btn.active{background:#3b82f6;color:#fff}
+        
+        /* Badges */
+        .badge{font-size:10px;font-weight:700;padding:4px 10px;border-radius:50px;text-transform:uppercase}
+        .badge-free{background:#10b981;color:#fff}
+        .badge-pro{background:#f59e0b;color:#fff}
+        
+        /* Quota */
+        .quota-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
+        .quota-fill{height:100%;background:#3b82f6;border-radius:2px;transition:width .5s}
+        
+        /* Modal */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:100}
+        .modal-content{position:relative;z-index:101}
+        
+        /* Cookie Banner */
+        .cookie-banner{position:fixed;bottom:0;left:0;right:0;z-index:90;transform:translateY(100%);transition:transform .4s}
+        .cookie-banner.show{transform:translateY(0)}
+        
+        /* Footer links */
+        .footer-link{color:#64748b;font-size:13px;transition:color .2s}
+        .footer-link:hover{color:#3b82f6}
+        
+        /* Social icons */
+        .social-icon{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;color:#64748b;transition:all .2s}
+        .social-icon:hover{background:rgba(59,130,246,.2);color:#3b82f6}
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+        
+        /* Video call mode */
+        .call-mode .chat-bubbles{display:none}
+        .call-mode .video-container{display:flex!important}
+        
+        /* RTL Support */
+        [dir="rtl"] .mr-2{margin-right:0;margin-left:0.5rem}
+        [dir="rtl"] .ml-2{margin-left:0;margin-right:0.5rem}
+        [dir="rtl"] .ml-auto{margin-left:0;margin-right:auto}
+        [dir="rtl"] .text-left{text-align:right}
+        [dir="rtl"] .text-right{text-align:left}
+        [dir="rtl"] .gap-2>*+*{margin-right:0.5rem;margin-left:0}
+        [dir="rtl"] .fa-arrow-left:before{content:"\f061"}
+        [dir="rtl"] .fa-arrow-right:before{content:"\f060"}
+        [dir="rtl"] .bubble-user{margin-left:0;margin-right:auto;border-bottom-right-radius:20px;border-bottom-left-radius:6px}
+        [dir="rtl"] .bubble-coach{border-bottom-left-radius:20px;border-bottom-right-radius:6px}
+        [dir="rtl"] select,[dir="rtl"] input,[dir="rtl"] textarea{text-align:right}
+        
+        /* Responsive */
+        @media(max-width:640px){
+            .mic-btn{width:70px;height:70px;font-size:24px}
+            .btn-primary,.btn-secondary{padding:12px 20px;font-size:14px}
+        }
     </style>
 </head>
 <body>
-    <div id="loader-screen" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="w-8 h-8 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin"></div>
-    </div>
-    <div id="login-screen" class="fixed inset-0 bg-[#f5f5f7] z-40 flex flex-col items-center justify-center p-6 hidden">
-        <div class="text-center max-w-md w-full fade-in">
-            <div class="w-24 h-24 mx-auto mb-8 rounded-[24px] shadow-2xl bg-white flex items-center justify-center overflow-hidden">
-                <video src="/idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
-            </div>
-            <h1 class="text-4xl font-bold tracking-tight text-[#1d1d1f] mb-2">Job Simulator.</h1>
-            <p class="text-[#86868b] text-lg font-normal mb-10">Master your interview skills with AI.</p>
-            <a href="/auth/login" class="flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-black py-4 px-8 rounded-full shadow-sm border border-slate-200 w-full transition-transform active:scale-95">
-                <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5">
-                <span class="font-semibold">Sign in with Google</span>
-            </a>
-        </div>
-    </div>
-    <div id="payment-screen" class="fixed inset-0 bg-white z-40 overflow-y-auto hidden">
-        <div class="max-w-2xl mx-auto px-6 py-12 md:py-20 text-center fade-in">
-            <h2 class="text-xs font-bold text-blue-600 tracking-widest uppercase mb-4">Pro Access</h2>
-            <h1 class="text-4xl md:text-5xl font-bold text-[#1d1d1f] mb-6 leading-tight">Your career upgrade.<br>For the price of a coffee.</h1>
-            <div class="bg-white border border-slate-100 shadow-xl rounded-3xl p-8 max-w-sm mx-auto relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
-                <div class="text-3xl font-bold mb-1">€9.99</div>
-                <div class="text-sm text-gray-400 mb-6">One-time payment.</div>
-                <div id="paypal-button-container" class="mb-4"></div>
-                <div class="flex gap-2 mb-4">
-                    <input id="promo-code" type="text" placeholder="Promo Code" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm w-full outline-none focus:border-blue-500">
-                    <button onclick="applyCode()" class="text-blue-600 font-bold text-sm px-2">Apply</button>
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         LOGIN SCREEN
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <div id="login-screen" class="min-h-screen flex flex-col hidden">
+        <div class="flex-1 flex items-center justify-center p-6">
+            <div class="w-full max-w-sm text-center">
+                <!-- Logo -->
+                <div class="w-20 h-20 mx-auto mb-6 rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/30">
+                    <img src="/static/fav.png" alt="Infinity Coach" class="w-full h-full object-cover">
                 </div>
-                <p id="promo-msg" class="text-xs h-4"></p>
-            </div>
-            <button onclick="location.href='/logout'" class="mt-8 text-sm text-gray-400 hover:text-black transition-colors">Sign out</button>
-        </div>
-    </div>
-    <div id="setup-screen" class="fixed inset-0 bg-[#f5f5f7] z-30 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-3xl shadow-xl w-full max-w-lg p-6 md:p-8 fade-in relative">
-            <button onclick="location.href='/logout'" class="absolute top-6 right-6 text-gray-300 hover:text-gray-500"><i class="fas fa-sign-out-alt"></i></button>
-            <div class="flex items-center gap-4 mb-8">
-                <div class="w-16 h-16 rounded-2xl overflow-hidden bg-gray-100 shadow-inner">
-                    <video src="/idle.mp4" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
+                
+                <!-- Title -->
+                <h1 class="text-3xl font-black mb-2">INFINITY <span class="text-blue-500">COACH</span></h1>
+                <p class="text-slate-400 text-sm mb-8">Master any skill with AI-powered<br>personal coaching</p>
+                
+                <!-- Google Button -->
+                <a href="/auth/login" class="btn-primary w-full flex items-center justify-center gap-3 mb-8">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    Continue with Google
+                </a>
+                
+                <!-- Features - Compact Grid -->
+                <div class="grid grid-cols-2 gap-3 text-left text-xs">
+                    <div class="glass p-3 rounded-xl flex items-center gap-3">
+                        <i class="fas fa-brain text-blue-400"></i>
+                        <span class="text-slate-300">AI Coaching</span>
+                    </div>
+                    <div class="glass p-3 rounded-xl flex items-center gap-3">
+                        <i class="fas fa-chart-line text-green-400"></i>
+                        <span class="text-slate-300">Track Progress</span>
+                    </div>
+                    <div class="glass p-3 rounded-xl flex items-center gap-3">
+                        <i class="fas fa-clock text-purple-400"></i>
+                        <span class="text-slate-300">24/7 Access</span>
+                    </div>
+                    <div class="glass p-3 rounded-xl flex items-center gap-3">
+                        <i class="fas fa-shield-alt text-amber-400"></i>
+                        <span class="text-slate-300">Safe Space</span>
+                    </div>
                 </div>
-                <div><h2 class="text-xl font-bold">New Interview</h2><p class="text-sm text-gray-400">Configure your simulation</p></div>
-            </div>
-            <div class="space-y-4">
-                <input id="inp-name" type="text" placeholder="Your Name" class="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 ring-blue-500/20 transition-all font-medium">
-                <input id="inp-job" type="text" placeholder="Target Job" value="Product Manager" class="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 ring-blue-500/20 transition-all font-medium">
-                <input id="inp-company" type="text" placeholder="Company Type" value="Tech Startup" class="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 ring-blue-500/20 transition-all font-medium">
-                <div class="relative">
-                    <input id="inp-cv" type="file" accept=".pdf,.docx,.txt" class="hidden" onchange="uploadCV()">
-                    <button onclick="document.getElementById('inp-cv').click()" class="w-full p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-300 text-gray-500 hover:bg-gray-100 transition-all text-left flex justify-between items-center">
-                        <span id="cv-label">Upload Resume (PDF/Doc)</span><i class="fas fa-cloud-upload-alt text-blue-500"></i>
-                    </button>
-                </div>
-                <button onclick="startSimulation()" class="w-full bg-[#0071e3] text-white font-semibold p-4 rounded-2xl shadow-lg hover:bg-blue-600 active:scale-95 transition-all mt-4">Start Interview</button>
             </div>
         </div>
-    </div>
-    <div id="chat-interface" class="fixed inset-0 bg-white z-20 flex flex-col hidden">
-        <header class="glass sticky top-0 z-10 p-4 flex flex-col items-center justify-center shadow-sm">
-            <div class="flex items-center w-full relative mb-2">
-                 <button onclick="if(confirm('Quit?')) location.reload()" class="absolute left-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500"><i class="fas fa-chevron-left"></i></button>
-                 <div class="mx-auto text-center">
-                    <h3 class="font-bold text-sm leading-tight">AI Recruiter</h3>
-                    <p class="text-[10px] text-green-500 font-bold uppercase tracking-wider">Online</p>
-                 </div>
+        
+        <!-- Footer -->
+        <footer class="p-6 text-center">
+            <p class="text-xs text-slate-600 mb-2">© 2024 Emmanuel Smadja Ltd</p>
+            <div class="flex justify-center gap-4">
+                <a href="#" onclick="showModal('privacy')" class="footer-link text-xs">Privacy</a>
+                <a href="#" onclick="showModal('terms')" class="footer-link text-xs">Terms</a>
+                <a href="#" onclick="showModal('legal')" class="footer-link text-xs">Legal</a>
             </div>
-            <div class="w-32 h-32 rounded-full overflow-hidden bg-gray-200 border-4 border-white shadow-lg relative">
-                <video id="avatar-video" src="/idle.mp4" loop muted playsinline class="w-full h-full object-cover"></video>
-            </div>
-        </header>
-        <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-6 pb-40 bg-[#f5f5f7] no-scrollbar"></main>
-        <footer class="absolute bottom-0 w-full p-6 glass rounded-t-[32px] flex flex-col items-center justify-center">
-            <p id="mic-status" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Hold to Speak</p>
-            <button id="mic-btn" class="w-20 h-20 rounded-full bg-[#0071e3] text-white text-2xl shadow-2xl shadow-blue-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95"><i class="fas fa-microphone"></i></button>
         </footer>
     </div>
-    <script>
-        const API_URL = "";
-        let sessionId = 'sess_' + Date.now();
-        let mediaRecorder, audioChunks = [];
-        let cvContent = "";
-        let currentAudio = null;
 
-        window.onload = async () => {
-            try {
-                const res = await fetch('/api/me');
-                const data = await res.json();
-                document.getElementById('loader-screen').style.display = 'none';
-                if (!data.logged_in) document.getElementById('login-screen').classList.remove('hidden');
-                else if (!data.is_paid) { document.getElementById('payment-screen').classList.remove('hidden'); initPayPal(); }
-                else {
-                    document.getElementById('setup-screen').classList.remove('hidden');
-                    if (data.name) document.getElementById('inp-name').value = data.name;
-                    if (data.saved_cv) { cvContent = data.saved_cv; document.getElementById('cv-label').innerText = "Resume Loaded ✅"; document.getElementById('cv-label').classList.add('text-green-600'); }
-                }
-            } catch (e) { console.error(e); }
-        };
-
-        function initPayPal() {
-            if(!window.paypal) return setTimeout(initPayPal, 500);
-            paypal.Buttons({
-                createOrder: (d, a) => a.order.create({ purchase_units: [{ amount: { value: '9.99' } }] }),
-                onApprove: (d, a) => a.order.capture().then(async () => { await fetch('/api/payment_success', {method: 'POST'}); location.reload(); })
-            }).render('#paypal-button-container');
-        }
-
-        async function applyCode() {
-            const code = document.getElementById('promo-code').value;
-            const res = await fetch('/api/promo_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code}) });
-            const d = await res.json();
-            document.getElementById('promo-msg').innerText = d.message;
-            if(d.status === 'free_access_granted') setTimeout(() => location.reload(), 1500);
-        }
-
-        async function uploadCV() {
-            const file = document.getElementById('inp-cv').files[0];
-            if(!file) return;
-            const fd = new FormData(); fd.append('file', file);
-            document.getElementById('cv-label').innerText = "Uploading...";
-            try {
-                const res = await fetch('/upload_cv', {method: 'POST', body: fd});
-                const d = await res.json();
-                cvContent = d.text;
-                document.getElementById('cv-label').innerText = "Resume Ready ✅";
-                document.getElementById('cv-label').classList.add('text-green-600');
-            } catch(e) { document.getElementById('cv-label').innerText = "Error. Try again."; }
-        }
-
-        async function startSimulation() {
-            const name = document.getElementById('inp-name').value;
-            const job = document.getElementById('inp-job').value;
-            const company = document.getElementById('inp-company').value;
-            document.getElementById('setup-screen').classList.add('hidden');
-            document.getElementById('chat-interface').classList.remove('hidden');
-            const res = await fetch('/start_chat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({session_id: sessionId, candidate_name: name, job_title: job, company_type: company, cv_content: cvContent}) });
-            const d = await res.json();
-            addMessage('coach', d.coach_response_text);
-            if(d.audio_base64) playAudio(d.audio_base64);
-            setupMic();
-        }
-
-        const micBtn = document.getElementById('mic-btn');
-        const statusTxt = document.getElementById('mic-status');
-        const avatar = document.getElementById('avatar-video');
-
-        function playAudio(b64) {
-            if(currentAudio) { currentAudio.pause(); currentAudio = null; }
-            currentAudio = new Audio("data:audio/mp3;base64," + b64);
-            avatar.src = "/talk.mp4"; 
-            avatar.play().catch(e => console.log("Video play interrupted")); 
-            currentAudio.onended = () => { avatar.src = "/idle.mp4"; avatar.play(); };
-            currentAudio.play().catch(e => console.log("Audio play blocked"));
-        }
-
-        function addMessage(role, text, feedback=null) {
-            const box = document.getElementById('chat-box');
-            let html = `<div class="w-full flex ${role==='coach'?'justify-start':'justify-end'} fade-in"><div class="bubble ${role==='coach'?'bubble-coach':'bubble-user'}">${text}</div></div>`;
-            if(feedback) {
-                const color = feedback.score >= 8 ? 'text-green-500' : 'text-orange-500';
-                html += `
-                <div class="w-full flex justify-start fade-in mt-2 mb-4">
-                    <div class="bg-white p-4 rounded-2xl shadow-sm text-xs text-gray-600 max-w-[90%] border border-gray-100">
-                        <div class="flex justify-between mb-2 border-b border-gray-100 pb-2">
-                            <span class="font-bold">SCORE</span> <span class="font-bold ${color} text-lg">${feedback.score}<span class="text-xs text-gray-300">/10</span></span>
-                        </div>
-                        <div class="mb-3"><span class="text-blue-500 font-bold uppercase text-[10px]">Tip</span><p class="mt-1">${feedback.tip}</p></div>
-                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <span class="text-gray-400 font-bold uppercase text-[10px] mb-1 block">Masterclass Answer</span>
-                            <div class="italic text-gray-600 blur-reveal" onclick="this.classList.add('revealed')">"${feedback.better}"</div>
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         DASHBOARD
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <div id="dashboard" class="min-h-screen flex flex-col hidden">
+        <!-- Header -->
+        <header class="glass-strong sticky top-0 z-50 px-4 py-3">
+            <div class="max-w-4xl mx-auto flex items-center justify-between">
+                <a href="/" class="flex items-center gap-2">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                        <i class="fas fa-infinity text-white text-sm"></i>
+                    </div>
+                    <span class="font-bold text-sm hidden sm:block">INFINITY <span class="text-blue-500">COACH</span></span>
+                </a>
+                
+                <div class="flex items-center gap-2">
+                    <!-- Quota -->
+                    <div id="quota-display" class="hidden flex items-center gap-2 mr-2">
+                        <span id="quota-text" class="text-xs text-slate-400">10/10</span>
+                        <div class="quota-bar w-12"><div id="quota-fill" class="quota-fill" style="width:100%"></div></div>
+                    </div>
+                    
+                    <button onclick="showModal('settings')" class="w-9 h-9 rounded-xl glass flex items-center justify-center hover:bg-white/5">
+                        <i class="fas fa-cog text-slate-400 text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <div class="max-w-4xl mx-auto p-4 pb-48">
+                <!-- Greeting -->
+                <div class="mb-6">
+                    <h1 class="text-xl font-bold mb-1">
+                        <span id="greeting">Good morning</span>, <span id="user-name" class="text-blue-400">Coach</span>!
+                    </h1>
+                    <p id="dashboard-subtitle" class="text-slate-400 text-sm">Choose your coach and start improving</p>
+                </div>
+                
+                <!-- Quick Settings - Stack on mobile -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-6">
+                    <div class="glass p-3 rounded-xl">
+                        <label id="label-language" class="text-[10px] font-bold uppercase text-slate-500 block mb-1">Language</label>
+                        <select id="inp-lang" class="w-full text-sm p-2"></select>
+                    </div>
+                    <div class="glass p-3 rounded-xl">
+                        <label id="label-level" class="text-[10px] font-bold uppercase text-slate-500 block mb-1">Level</label>
+                        <select id="inp-level" class="w-full text-sm p-2">
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate" selected>Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div class="glass p-3 rounded-xl">
+                        <label id="label-speed" class="text-[10px] font-bold uppercase text-slate-500 block mb-1">Speed</label>
+                        <div class="flex gap-1">
+                            <button onclick="setSpeed(0.8)" class="speed-btn flex-1 text-xs">0.8x</button>
+                            <button onclick="setSpeed(1.0)" class="speed-btn flex-1 text-xs active">1x</button>
+                            <button onclick="setSpeed(1.2)" class="speed-btn flex-1 text-xs">1.2x</button>
                         </div>
                     </div>
-                </div>`;
-            }
-            box.insertAdjacentHTML('beforeend', html);
-            box.scrollTo({top: box.scrollHeight, behavior: 'smooth'});
-        }
-
-        function getBestMimeType() {
-            if (MediaRecorder.isTypeSupported('audio/webm')) return 'audio/webm';
-            if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
-            return ''; 
-        }
-
-        async function setupMic() {
-            micBtn.onmousedown = startRec; micBtn.onmouseup = stopRec;
-            micBtn.ontouchstart = (e) => {e.preventDefault(); startRec()}; 
-            micBtn.ontouchend = (e) => {e.preventDefault(); stopRec()};
-        }
-
-        async function startRec() {
-            // STOP IA SI ELLE PARLE (BARGE-IN)
-            if(currentAudio) { currentAudio.pause(); currentAudio = null; }
-            avatar.src = "/idle.mp4"; avatar.play();
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-                const mimeType = getBestMimeType();
-                const options = mimeType ? { mimeType } : {};
+                </div>
                 
-                mediaRecorder = new MediaRecorder(stream, options);
-                audioChunks = [];
-                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-                mediaRecorder.start();
+                <!-- Coaches Grid -->
+                <h3 id="label-select-coach" class="text-xs font-bold uppercase text-slate-500 mb-3">Select Coach</h3>
+                <div id="coaches-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"></div>
+            </div>
+        </main>
+        
+        <!-- Bottom Panel - Fixed -->
+        <div class="fixed bottom-0 left-0 right-0 glass-strong border-t border-white/5 p-4 z-40">
+            <div class="max-w-2xl mx-auto">
+                <!-- File Upload -->
+                <div class="flex items-center gap-2 mb-2">
+                    <button onclick="document.getElementById('inp-file').click()" class="flex items-center gap-2 text-xs text-slate-400 hover:text-blue-400 transition">
+                        <i class="fas fa-paperclip"></i>
+                        <span id="file-label">Attach file</span>
+                    </button>
+                    <input type="file" id="inp-file" class="hidden" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png" onchange="handleFile()">
+                    <span id="file-status" class="text-xs text-green-400 hidden"><i class="fas fa-check"></i></span>
+                </div>
                 
-                micBtn.classList.add('bg-red-500', 'scale-110');
-                statusTxt.innerText = "Listening...";
-            } catch(e) { alert("Mic Access Denied"); }
+                <!-- Context Input -->
+                <textarea id="inp-context" rows="2" class="w-full text-sm mb-3 resize-none px-4 py-3" placeholder="Add context (optional)..."></textarea>
+                
+                <!-- Buttons -->
+                <div class="flex gap-3">
+                    <button id="btn-chat" onclick="startSession('text')" class="flex-1 btn-primary text-sm py-3">
+                        <i class="fas fa-comments mr-2"></i><span>Chat Mode</span>
+                    </button>
+                    <button id="btn-call" onclick="startSession('call')" class="flex-1 btn-secondary text-sm py-3">
+                        <i class="fas fa-video mr-2"></i><span>Call Mode</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer - vraiment en bas après scroll -->
+        <footer class="pb-36 pt-2">
+            <div class="max-w-4xl mx-auto px-4 py-3 text-center text-xs text-slate-600">
+                <p class="mb-2">© 2024 Emmanuel Smadja Ltd</p>
+                <div class="flex justify-center gap-3">
+                    <a href="#" onclick="showModal('privacy')" class="footer-link">Privacy</a>
+                    <a href="#" onclick="showModal('terms')" class="footer-link">Terms</a>
+                    <a href="#" onclick="showModal('legal')" class="footer-link">Legal</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         CHAT INTERFACE (Text Mode)
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <div id="chat-screen" class="fixed inset-0 z-50 flex flex-col hidden">
+        <!-- Header -->
+        <header class="glass-strong p-4 flex items-center justify-between border-b border-white/5">
+            <button onclick="exitChat()" class="w-10 h-10 rounded-xl glass flex items-center justify-center">
+                <i class="fas fa-arrow-left text-slate-400"></i>
+            </button>
+            <div class="text-center">
+                <h3 id="chat-coach-name" class="font-bold text-sm">Coach</h3>
+                <span class="text-[10px] text-green-400 flex items-center justify-center gap-1">
+                    <span class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>Online
+                </span>
+            </div>
+            <button onclick="toggleCallMode()" class="w-10 h-10 rounded-xl glass flex items-center justify-center" title="Switch to call">
+                <i class="fas fa-video text-slate-400"></i>
+            </button>
+        </header>
+        
+        <!-- Messages -->
+        <main id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3"></main>
+        
+        <!-- Input Area -->
+        <footer class="glass-strong p-4 border-t border-white/5">
+            <div class="max-w-2xl mx-auto">
+                <!-- Voice Controls -->
+                <div id="voice-controls" class="flex flex-col items-center">
+                    <p id="mic-status" class="text-xs text-slate-500 mb-3">Hold to speak</p>
+                    <div class="flex items-center gap-4">
+                        <button onclick="toggleTextInput()" class="w-10 h-10 rounded-xl glass flex items-center justify-center text-slate-400">
+                            <i class="fas fa-keyboard"></i>
+                        </button>
+                        <button id="mic-btn" class="mic-btn"><i class="fas fa-microphone"></i></button>
+                        <button onclick="replayAudio()" class="w-10 h-10 rounded-xl glass flex items-center justify-center text-slate-400">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Text Controls -->
+                <div id="text-controls" class="hidden flex gap-3">
+                    <button onclick="toggleTextInput()" class="w-10 h-10 rounded-xl glass flex items-center justify-center text-slate-400">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <input id="text-input" type="text" class="flex-1" placeholder="Type message...">
+                    <button onclick="sendTextMessage()" class="w-10 h-10 rounded-xl btn-primary flex items-center justify-center">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         CALL INTERFACE (Video Mode)
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <div id="call-screen" class="fixed inset-0 z-50 flex flex-col hidden bg-black">
+        <!-- Video Area -->
+        <div class="flex-1 relative flex items-center justify-center">
+            <!-- Coach Avatar (large) -->
+            <div class="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden border-4 border-blue-500/30 shadow-2xl shadow-blue-500/20">
+                <video id="call-avatar" class="w-full h-full object-cover" loop muted playsinline></video>
+            </div>
+            
+            <!-- Status -->
+            <div id="call-status" class="absolute bottom-8 left-1/2 -translate-x-1/2 glass px-4 py-2 rounded-full text-sm">
+                <i class="fas fa-circle text-green-400 text-xs mr-2 animate-pulse"></i>
+                <span id="call-status-text">Connected</span>
+            </div>
+            
+            <!-- Coach Name -->
+            <div class="absolute top-8 left-1/2 -translate-x-1/2 text-center">
+                <h2 id="call-coach-name" class="text-xl font-bold">Coach</h2>
+                <p class="text-sm text-slate-400">AI Coach</p>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="glass-strong p-6 border-t border-white/5">
+            <div class="max-w-sm mx-auto flex items-center justify-center gap-6">
+                <button onclick="toggleCallMode()" class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-slate-300 hover:bg-white/20">
+                    <i class="fas fa-comments text-xl"></i>
+                </button>
+                <button id="call-mic-btn" class="mic-btn"><i class="fas fa-microphone"></i></button>
+                <button onclick="exitChat()" class="w-14 h-14 rounded-full bg-red-500 flex items-center justify-center text-white hover:bg-red-600">
+                    <i class="fas fa-phone-slash text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         MODALS
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <div id="modal-container" class="fixed inset-0 z-[200] hidden">
+        <div class="modal-overlay" onclick="handleOverlayClick()"></div>
+        <div class="modal-content absolute inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg sm:max-h-[80vh] overflow-y-auto glass rounded-2xl">
+            <div id="modal-body" class="p-6"></div>
+        </div>
+    </div>
+
+    <!-- Cookie Banner -->
+    <div id="cookie-banner" class="cookie-banner glass-strong p-4 border-t border-white/5">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <p class="text-xs text-slate-400">
+                <i class="fas fa-cookie-bite mr-2 text-amber-400"></i>
+                We use cookies. <a href="#" onclick="showModal('privacy')" class="text-blue-400">Learn more</a>
+            </p>
+            <button onclick="acceptCookies()" class="btn-primary text-xs py-2 px-4">OK</button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         JAVASCRIPT
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <script>
+    // ═══════════════════════════════════════════════════════════════
+    // TRANSLATIONS
+    // ═══════════════════════════════════════════════════════════════
+    const TRANSLATIONS = {
+        en: {
+            welcome: "Welcome to Infinity Coach!",
+            personalize: "Let's personalize your experience",
+            whatName: "What should I call you?",
+            namePlaceholder: "Your name or nickname",
+            interfaceLang: "Interface Language",
+            practiceLang: "What language do you want to practice?",
+            selectLanguage: "Select a language...",
+            yourLevel: "Your level",
+            letsStart: "Let's Start!",
+            goodMorning: "Good morning",
+            goodAfternoon: "Good afternoon",
+            goodEvening: "Good evening",
+            chooseCoach: "Choose your coach and start improving",
+            language: "Language",
+            level: "Level",
+            speed: "Speed",
+            selectCoach: "Select Coach",
+            attachFile: "Attach file",
+            addContext: "Add context (optional)...",
+            chatMode: "Chat Mode",
+            callMode: "Call Mode",
+            holdToSpeak: "Hold to speak",
+            listening: "Listening...",
+            processing: "Processing...",
+            thinking: "Thinking...",
+            connected: "Connected",
+            online: "Online",
+            settings: "Settings",
+            subscription: "Subscription",
+            preferences: "Preferences",
+            displayName: "Display Name",
+            interface: "Interface",
+            practiceLanguage: "Practice Language",
+            voiceSpeed: "Voice Speed",
+            savePreferences: "Save Preferences",
+            promoCode: "Promo Code",
+            enterCode: "Enter code",
+            apply: "Apply",
+            contactSupport: "Contact Support",
+            logout: "Logout",
+            upgradeToPro: "Upgrade to Pro",
+            monthlyQuestions: "Monthly questions remaining",
+            proMember: "Pro member - Unlimited access",
+            manageSub: "Manage subscription in PayPal",
+            popular: "POPULAR",
+            proMonthly: "Pro Monthly",
+            save40: "SAVE 40%",
+            proYearly: "Pro Yearly",
+            contact: "Contact",
+            name: "Name",
+            email: "Email",
+            message: "Message",
+            send: "Send",
+            messageSent: "Message sent!",
+            privacy: "Privacy",
+            terms: "Terms",
+            legal: "Legal",
+            privacyPolicy: "Privacy Policy",
+            termsOfService: "Terms of Service",
+            beginner: "Beginner",
+            intermediate: "Intermediate",
+            advanced: "Advanced",
+            slow: "Slow",
+            normal: "Normal",
+            fast: "Fast",
+            active: "ACTIVE",
+            continueGoogle: "Continue with Google",
+            aiCoaching: "AI Coaching",
+            trackProgress: "Track Progress",
+            access247: "24/7 Access",
+            safeSpace: "Safe Space",
+            masterSkill: "Master any skill with AI-powered personal coaching"
+        },
+        fr: {
+            welcome: "Bienvenue sur Infinity Coach !",
+            personalize: "Personnalisons votre expérience",
+            whatName: "Comment dois-je vous appeler ?",
+            namePlaceholder: "Votre prénom ou surnom",
+            interfaceLang: "Langue de l'interface",
+            practiceLang: "Quelle langue voulez-vous pratiquer ?",
+            selectLanguage: "Sélectionnez une langue...",
+            yourLevel: "Votre niveau",
+            letsStart: "C'est parti !",
+            goodMorning: "Bonjour",
+            goodAfternoon: "Bon après-midi",
+            goodEvening: "Bonsoir",
+            chooseCoach: "Choisissez votre coach et progressez",
+            language: "Langue",
+            level: "Niveau",
+            speed: "Vitesse",
+            selectCoach: "Choisir un Coach",
+            attachFile: "Joindre un fichier",
+            addContext: "Ajouter un contexte (optionnel)...",
+            chatMode: "Mode Chat",
+            callMode: "Mode Appel",
+            holdToSpeak: "Maintenir pour parler",
+            listening: "Écoute...",
+            processing: "Traitement...",
+            thinking: "Réflexion...",
+            connected: "Connecté",
+            online: "En ligne",
+            settings: "Paramètres",
+            subscription: "Abonnement",
+            preferences: "Préférences",
+            displayName: "Nom affiché",
+            interface: "Interface",
+            practiceLanguage: "Langue de pratique",
+            voiceSpeed: "Vitesse de la voix",
+            savePreferences: "Enregistrer",
+            promoCode: "Code promo",
+            enterCode: "Entrer le code",
+            apply: "Appliquer",
+            contactSupport: "Contacter le support",
+            logout: "Déconnexion",
+            upgradeToPro: "Passer à Pro",
+            monthlyQuestions: "Questions restantes ce mois",
+            proMember: "Membre Pro - Accès illimité",
+            manageSub: "Gérer l'abonnement sur PayPal",
+            popular: "POPULAIRE",
+            proMonthly: "Pro Mensuel",
+            save40: "ÉCONOMISEZ 40%",
+            proYearly: "Pro Annuel",
+            contact: "Contact",
+            name: "Nom",
+            email: "Email",
+            message: "Message",
+            send: "Envoyer",
+            messageSent: "Message envoyé !",
+            privacy: "Confidentialité",
+            terms: "Conditions",
+            legal: "Mentions légales",
+            privacyPolicy: "Politique de confidentialité",
+            termsOfService: "Conditions d'utilisation",
+            beginner: "Débutant",
+            intermediate: "Intermédiaire",
+            advanced: "Avancé",
+            slow: "Lent",
+            normal: "Normal",
+            fast: "Rapide",
+            active: "ACTIF",
+            continueGoogle: "Continuer avec Google",
+            aiCoaching: "Coaching IA",
+            trackProgress: "Suivre les progrès",
+            access247: "Accès 24/7",
+            safeSpace: "Espace sûr",
+            masterSkill: "Maîtrisez toute compétence avec un coaching IA personnalisé"
+        },
+        es: {
+            welcome: "¡Bienvenido a Infinity Coach!",
+            personalize: "Personalicemos tu experiencia",
+            whatName: "¿Cómo debo llamarte?",
+            namePlaceholder: "Tu nombre o apodo",
+            interfaceLang: "Idioma de la interfaz",
+            practiceLang: "¿Qué idioma quieres practicar?",
+            selectLanguage: "Selecciona un idioma...",
+            yourLevel: "Tu nivel",
+            letsStart: "¡Empecemos!",
+            goodMorning: "Buenos días",
+            goodAfternoon: "Buenas tardes",
+            goodEvening: "Buenas noches",
+            chooseCoach: "Elige tu coach y mejora",
+            language: "Idioma",
+            level: "Nivel",
+            speed: "Velocidad",
+            selectCoach: "Seleccionar Coach",
+            attachFile: "Adjuntar archivo",
+            addContext: "Añadir contexto (opcional)...",
+            chatMode: "Modo Chat",
+            callMode: "Modo Llamada",
+            holdToSpeak: "Mantén para hablar",
+            listening: "Escuchando...",
+            processing: "Procesando...",
+            thinking: "Pensando...",
+            connected: "Conectado",
+            online: "En línea",
+            settings: "Ajustes",
+            subscription: "Suscripción",
+            preferences: "Preferencias",
+            displayName: "Nombre",
+            interface: "Interfaz",
+            practiceLanguage: "Idioma de práctica",
+            voiceSpeed: "Velocidad de voz",
+            savePreferences: "Guardar",
+            promoCode: "Código promocional",
+            enterCode: "Introducir código",
+            apply: "Aplicar",
+            contactSupport: "Contactar soporte",
+            logout: "Cerrar sesión",
+            upgradeToPro: "Actualizar a Pro",
+            monthlyQuestions: "Preguntas restantes este mes",
+            proMember: "Miembro Pro - Acceso ilimitado",
+            manageSub: "Gestionar suscripción en PayPal",
+            popular: "POPULAR",
+            proMonthly: "Pro Mensual",
+            save40: "AHORRA 40%",
+            proYearly: "Pro Anual",
+            contact: "Contacto",
+            name: "Nombre",
+            email: "Email",
+            message: "Mensaje",
+            send: "Enviar",
+            messageSent: "¡Mensaje enviado!",
+            privacy: "Privacidad",
+            terms: "Términos",
+            legal: "Legal",
+            privacyPolicy: "Política de privacidad",
+            termsOfService: "Términos de servicio",
+            beginner: "Principiante",
+            intermediate: "Intermedio",
+            advanced: "Avanzado",
+            slow: "Lento",
+            normal: "Normal",
+            fast: "Rápido",
+            active: "ACTIVO",
+            continueGoogle: "Continuar con Google",
+            aiCoaching: "Coaching IA",
+            trackProgress: "Seguir progreso",
+            access247: "Acceso 24/7",
+            safeSpace: "Espacio seguro",
+            masterSkill: "Domina cualquier habilidad con coaching IA personalizado"
+        },
+        he: {
+            welcome: "!ברוכים הבאים ל-Infinity Coach",
+            personalize: "בואו נתאים את החוויה שלך",
+            whatName: "?איך לקרוא לך",
+            namePlaceholder: "השם או הכינוי שלך",
+            interfaceLang: "שפת הממשק",
+            practiceLang: "?באיזו שפה תרצה לתרגל",
+            selectLanguage: "...בחר שפה",
+            yourLevel: "הרמה שלך",
+            letsStart: "!בואו נתחיל",
+            goodMorning: "בוקר טוב",
+            goodAfternoon: "צהריים טובים",
+            goodEvening: "ערב טוב",
+            chooseCoach: "בחר את המאמן שלך והתחל להשתפר",
+            language: "שפה",
+            level: "רמה",
+            speed: "מהירות",
+            selectCoach: "בחר מאמן",
+            attachFile: "צרף קובץ",
+            addContext: "...(הוסף הקשר (אופציונלי",
+            chatMode: "מצב צ'אט",
+            callMode: "מצב שיחה",
+            holdToSpeak: "החזק כדי לדבר",
+            listening: "...מאזין",
+            processing: "...מעבד",
+            thinking: "...חושב",
+            connected: "מחובר",
+            online: "מקוון",
+            settings: "הגדרות",
+            subscription: "מנוי",
+            preferences: "העדפות",
+            displayName: "שם תצוגה",
+            interface: "ממשק",
+            practiceLanguage: "שפת תרגול",
+            voiceSpeed: "מהירות קול",
+            savePreferences: "שמור",
+            promoCode: "קוד קופון",
+            enterCode: "הכנס קוד",
+            apply: "החל",
+            contactSupport: "צור קשר עם התמיכה",
+            logout: "התנתק",
+            upgradeToPro: "שדרג ל-Pro",
+            monthlyQuestions: "שאלות שנותרו החודש",
+            proMember: "חבר Pro - גישה בלתי מוגבלת",
+            manageSub: "נהל מנוי ב-PayPal",
+            popular: "פופולרי",
+            proMonthly: "Pro חודשי",
+            save40: "חסוך 40%",
+            proYearly: "Pro שנתי",
+            contact: "צור קשר",
+            name: "שם",
+            email: "אימייל",
+            message: "הודעה",
+            send: "שלח",
+            messageSent: "!ההודעה נשלחה",
+            privacy: "פרטיות",
+            terms: "תנאים",
+            legal: "משפטי",
+            privacyPolicy: "מדיניות פרטיות",
+            termsOfService: "תנאי שימוש",
+            beginner: "מתחיל",
+            intermediate: "בינוני",
+            advanced: "מתקדם",
+            slow: "איטי",
+            normal: "רגיל",
+            fast: "מהיר",
+            active: "פעיל",
+            continueGoogle: "המשך עם Google",
+            aiCoaching: "אימון AI",
+            trackProgress: "עקוב אחר התקדמות",
+            access247: "גישה 24/7",
+            safeSpace: "מרחב בטוח",
+            masterSkill: "שלוט בכל מיומנות עם אימון AI מותאם אישית"
+        },
+        de: {
+            welcome: "Willkommen bei Infinity Coach!",
+            personalize: "Lass uns deine Erfahrung personalisieren",
+            whatName: "Wie soll ich dich nennen?",
+            namePlaceholder: "Dein Name oder Spitzname",
+            interfaceLang: "Oberflächensprache",
+            practiceLang: "Welche Sprache möchtest du üben?",
+            selectLanguage: "Sprache auswählen...",
+            yourLevel: "Dein Level",
+            letsStart: "Los geht's!",
+            goodMorning: "Guten Morgen",
+            goodAfternoon: "Guten Tag",
+            goodEvening: "Guten Abend",
+            chooseCoach: "Wähle deinen Coach und verbessere dich",
+            language: "Sprache",
+            level: "Niveau",
+            speed: "Geschwindigkeit",
+            selectCoach: "Coach wählen",
+            attachFile: "Datei anhängen",
+            addContext: "Kontext hinzufügen (optional)...",
+            chatMode: "Chat-Modus",
+            callMode: "Anruf-Modus",
+            holdToSpeak: "Halten zum Sprechen",
+            listening: "Höre zu...",
+            processing: "Verarbeite...",
+            thinking: "Denke nach...",
+            connected: "Verbunden",
+            online: "Online",
+            settings: "Einstellungen",
+            subscription: "Abonnement",
+            preferences: "Einstellungen",
+            displayName: "Anzeigename",
+            interface: "Oberfläche",
+            practiceLanguage: "Übungssprache",
+            voiceSpeed: "Sprechgeschwindigkeit",
+            savePreferences: "Speichern",
+            promoCode: "Promo-Code",
+            enterCode: "Code eingeben",
+            apply: "Anwenden",
+            contactSupport: "Support kontaktieren",
+            logout: "Abmelden",
+            upgradeToPro: "Auf Pro upgraden",
+            monthlyQuestions: "Monatliche Fragen verbleibend",
+            proMember: "Pro-Mitglied - Unbegrenzter Zugang",
+            manageSub: "Abo bei PayPal verwalten",
+            popular: "BELIEBT",
+            proMonthly: "Pro Monatlich",
+            save40: "40% SPAREN",
+            proYearly: "Pro Jährlich",
+            contact: "Kontakt",
+            name: "Name",
+            email: "E-Mail",
+            message: "Nachricht",
+            send: "Senden",
+            messageSent: "Nachricht gesendet!",
+            privacy: "Datenschutz",
+            terms: "AGB",
+            legal: "Impressum",
+            privacyPolicy: "Datenschutzerklärung",
+            termsOfService: "Nutzungsbedingungen",
+            beginner: "Anfänger",
+            intermediate: "Mittelstufe",
+            advanced: "Fortgeschritten",
+            slow: "Langsam",
+            normal: "Normal",
+            fast: "Schnell",
+            active: "AKTIV",
+            continueGoogle: "Mit Google fortfahren",
+            aiCoaching: "KI-Coaching",
+            trackProgress: "Fortschritt verfolgen",
+            access247: "24/7 Zugang",
+            safeSpace: "Sicherer Raum",
+            masterSkill: "Meistere jede Fähigkeit mit personalisiertem KI-Coaching"
+        },
+        it: {
+            welcome: "Benvenuto su Infinity Coach!",
+            personalize: "Personalizziamo la tua esperienza",
+            whatName: "Come devo chiamarti?",
+            namePlaceholder: "Il tuo nome o soprannome",
+            interfaceLang: "Lingua dell'interfaccia",
+            practiceLang: "Quale lingua vuoi praticare?",
+            selectLanguage: "Seleziona una lingua...",
+            yourLevel: "Il tuo livello",
+            letsStart: "Iniziamo!",
+            goodMorning: "Buongiorno",
+            goodAfternoon: "Buon pomeriggio",
+            goodEvening: "Buonasera",
+            chooseCoach: "Scegli il tuo coach e migliora",
+            language: "Lingua",
+            level: "Livello",
+            speed: "Velocità",
+            selectCoach: "Seleziona Coach",
+            attachFile: "Allega file",
+            addContext: "Aggiungi contesto (opzionale)...",
+            chatMode: "Modalità Chat",
+            callMode: "Modalità Chiamata",
+            holdToSpeak: "Tieni premuto per parlare",
+            listening: "Ascolto...",
+            processing: "Elaborazione...",
+            thinking: "Pensando...",
+            connected: "Connesso",
+            online: "Online",
+            settings: "Impostazioni",
+            subscription: "Abbonamento",
+            preferences: "Preferenze",
+            displayName: "Nome visualizzato",
+            interface: "Interfaccia",
+            practiceLanguage: "Lingua di pratica",
+            voiceSpeed: "Velocità voce",
+            savePreferences: "Salva",
+            promoCode: "Codice promozionale",
+            enterCode: "Inserisci codice",
+            apply: "Applica",
+            contactSupport: "Contatta supporto",
+            logout: "Esci",
+            upgradeToPro: "Passa a Pro",
+            monthlyQuestions: "Domande mensili rimanenti",
+            proMember: "Membro Pro - Accesso illimitato",
+            manageSub: "Gestisci abbonamento su PayPal",
+            popular: "POPOLARE",
+            proMonthly: "Pro Mensile",
+            save40: "RISPARMIA 40%",
+            proYearly: "Pro Annuale",
+            contact: "Contatto",
+            name: "Nome",
+            email: "Email",
+            message: "Messaggio",
+            send: "Invia",
+            messageSent: "Messaggio inviato!",
+            privacy: "Privacy",
+            terms: "Termini",
+            legal: "Legale",
+            privacyPolicy: "Informativa sulla privacy",
+            termsOfService: "Termini di servizio",
+            beginner: "Principiante",
+            intermediate: "Intermedio",
+            advanced: "Avanzato",
+            slow: "Lento",
+            normal: "Normale",
+            fast: "Veloce",
+            active: "ATTIVO",
+            continueGoogle: "Continua con Google",
+            aiCoaching: "Coaching IA",
+            trackProgress: "Traccia progressi",
+            access247: "Accesso 24/7",
+            safeSpace: "Spazio sicuro",
+            masterSkill: "Padroneggia qualsiasi abilità con coaching IA personalizzato"
+        },
+        pt: {
+            welcome: "Bem-vindo ao Infinity Coach!",
+            personalize: "Vamos personalizar sua experiência",
+            whatName: "Como devo te chamar?",
+            namePlaceholder: "Seu nome ou apelido",
+            interfaceLang: "Idioma da interface",
+            practiceLang: "Qual idioma você quer praticar?",
+            selectLanguage: "Selecione um idioma...",
+            yourLevel: "Seu nível",
+            letsStart: "Vamos começar!",
+            goodMorning: "Bom dia",
+            goodAfternoon: "Boa tarde",
+            goodEvening: "Boa noite",
+            chooseCoach: "Escolha seu coach e melhore",
+            language: "Idioma",
+            level: "Nível",
+            speed: "Velocidade",
+            selectCoach: "Selecionar Coach",
+            attachFile: "Anexar arquivo",
+            addContext: "Adicionar contexto (opcional)...",
+            chatMode: "Modo Chat",
+            callMode: "Modo Chamada",
+            holdToSpeak: "Segure para falar",
+            listening: "Ouvindo...",
+            processing: "Processando...",
+            thinking: "Pensando...",
+            connected: "Conectado",
+            online: "Online",
+            settings: "Configurações",
+            subscription: "Assinatura",
+            preferences: "Preferências",
+            displayName: "Nome de exibição",
+            interface: "Interface",
+            practiceLanguage: "Idioma de prática",
+            voiceSpeed: "Velocidade da voz",
+            savePreferences: "Salvar",
+            promoCode: "Código promocional",
+            enterCode: "Inserir código",
+            apply: "Aplicar",
+            contactSupport: "Contatar suporte",
+            logout: "Sair",
+            upgradeToPro: "Atualizar para Pro",
+            monthlyQuestions: "Perguntas mensais restantes",
+            proMember: "Membro Pro - Acesso ilimitado",
+            manageSub: "Gerenciar assinatura no PayPal",
+            popular: "POPULAR",
+            proMonthly: "Pro Mensal",
+            save40: "ECONOMIZE 40%",
+            proYearly: "Pro Anual",
+            contact: "Contato",
+            name: "Nome",
+            email: "Email",
+            message: "Mensagem",
+            send: "Enviar",
+            messageSent: "Mensagem enviada!",
+            privacy: "Privacidade",
+            terms: "Termos",
+            legal: "Legal",
+            privacyPolicy: "Política de privacidade",
+            termsOfService: "Termos de serviço",
+            beginner: "Iniciante",
+            intermediate: "Intermediário",
+            advanced: "Avançado",
+            slow: "Lento",
+            normal: "Normal",
+            fast: "Rápido",
+            active: "ATIVO",
+            continueGoogle: "Continuar com Google",
+            aiCoaching: "Coaching IA",
+            trackProgress: "Acompanhar progresso",
+            access247: "Acesso 24/7",
+            safeSpace: "Espaço seguro",
+            masterSkill: "Domine qualquer habilidade com coaching IA personalizado"
+        },
+        ru: {
+            welcome: "Добро пожаловать в Infinity Coach!",
+            personalize: "Давайте настроим ваш опыт",
+            whatName: "Как мне вас называть?",
+            namePlaceholder: "Ваше имя или псевдоним",
+            interfaceLang: "Язык интерфейса",
+            practiceLang: "Какой язык вы хотите практиковать?",
+            selectLanguage: "Выберите язык...",
+            yourLevel: "Ваш уровень",
+            letsStart: "Начнём!",
+            goodMorning: "Доброе утро",
+            goodAfternoon: "Добрый день",
+            goodEvening: "Добрый вечер",
+            chooseCoach: "Выберите коуча и развивайтесь",
+            language: "Язык",
+            level: "Уровень",
+            speed: "Скорость",
+            selectCoach: "Выбрать коуча",
+            attachFile: "Прикрепить файл",
+            addContext: "Добавить контекст (необязательно)...",
+            chatMode: "Режим чата",
+            callMode: "Режим звонка",
+            holdToSpeak: "Удерживайте для записи",
+            listening: "Слушаю...",
+            processing: "Обработка...",
+            thinking: "Думаю...",
+            connected: "Подключено",
+            online: "Онлайн",
+            settings: "Настройки",
+            subscription: "Подписка",
+            preferences: "Предпочтения",
+            displayName: "Имя",
+            interface: "Интерфейс",
+            practiceLanguage: "Язык практики",
+            voiceSpeed: "Скорость голоса",
+            savePreferences: "Сохранить",
+            promoCode: "Промокод",
+            enterCode: "Введите код",
+            apply: "Применить",
+            contactSupport: "Связаться с поддержкой",
+            logout: "Выйти",
+            upgradeToPro: "Перейти на Pro",
+            monthlyQuestions: "Осталось вопросов в месяц",
+            proMember: "Pro участник - Безлимитный доступ",
+            manageSub: "Управление подпиской в PayPal",
+            popular: "ПОПУЛЯРНЫЙ",
+            proMonthly: "Pro Месяц",
+            save40: "СКИДКА 40%",
+            proYearly: "Pro Год",
+            contact: "Контакт",
+            name: "Имя",
+            email: "Email",
+            message: "Сообщение",
+            send: "Отправить",
+            messageSent: "Сообщение отправлено!",
+            privacy: "Конфиденциальность",
+            terms: "Условия",
+            legal: "Правовая информация",
+            privacyPolicy: "Политика конфиденциальности",
+            termsOfService: "Условия использования",
+            beginner: "Начинающий",
+            intermediate: "Средний",
+            advanced: "Продвинутый",
+            slow: "Медленно",
+            normal: "Нормально",
+            fast: "Быстро",
+            active: "АКТИВНО",
+            continueGoogle: "Продолжить с Google",
+            aiCoaching: "ИИ-коучинг",
+            trackProgress: "Отслеживать прогресс",
+            access247: "Доступ 24/7",
+            safeSpace: "Безопасное пространство",
+            masterSkill: "Освойте любой навык с персонализированным ИИ-коучингом"
+        },
+        ar: {
+            welcome: "!Infinity Coach مرحباً بك في",
+            personalize: "دعنا نخصص تجربتك",
+            whatName: "ماذا يجب أن أناديك؟",
+            namePlaceholder: "اسمك أو لقبك",
+            interfaceLang: "لغة الواجهة",
+            practiceLang: "ما اللغة التي تريد ممارستها؟",
+            selectLanguage: "...اختر لغة",
+            yourLevel: "مستواك",
+            letsStart: "!هيا نبدأ",
+            goodMorning: "صباح الخير",
+            goodAfternoon: "مساء الخير",
+            goodEvening: "مساء الخير",
+            chooseCoach: "اختر مدربك وابدأ بالتحسن",
+            language: "اللغة",
+            level: "المستوى",
+            speed: "السرعة",
+            selectCoach: "اختر المدرب",
+            attachFile: "إرفاق ملف",
+            addContext: "...(إضافة سياق (اختياري",
+            chatMode: "وضع المحادثة",
+            callMode: "وضع المكالمة",
+            holdToSpeak: "اضغط للتحدث",
+            listening: "...يستمع",
+            processing: "...يعالج",
+            thinking: "...يفكر",
+            connected: "متصل",
+            online: "متصل",
+            settings: "الإعدادات",
+            subscription: "الاشتراك",
+            preferences: "التفضيلات",
+            displayName: "الاسم المعروض",
+            interface: "الواجهة",
+            practiceLanguage: "لغة الممارسة",
+            voiceSpeed: "سرعة الصوت",
+            savePreferences: "حفظ",
+            promoCode: "رمز ترويجي",
+            enterCode: "أدخل الرمز",
+            apply: "تطبيق",
+            contactSupport: "اتصل بالدعم",
+            logout: "تسجيل خروج",
+            upgradeToPro: "الترقية إلى Pro",
+            monthlyQuestions: "الأسئلة المتبقية هذا الشهر",
+            proMember: "عضو Pro - وصول غير محدود",
+            manageSub: "إدارة الاشتراك في PayPal",
+            popular: "شائع",
+            proMonthly: "Pro شهري",
+            save40: "وفر 40%",
+            proYearly: "Pro سنوي",
+            contact: "اتصل",
+            name: "الاسم",
+            email: "البريد الإلكتروني",
+            message: "الرسالة",
+            send: "إرسال",
+            messageSent: "!تم إرسال الرسالة",
+            privacy: "الخصوصية",
+            terms: "الشروط",
+            legal: "قانوني",
+            privacyPolicy: "سياسة الخصوصية",
+            termsOfService: "شروط الخدمة",
+            beginner: "مبتدئ",
+            intermediate: "متوسط",
+            advanced: "متقدم",
+            slow: "بطيء",
+            normal: "عادي",
+            fast: "سريع",
+            active: "نشط",
+            continueGoogle: "المتابعة مع Google",
+            aiCoaching: "تدريب AI",
+            trackProgress: "تتبع التقدم",
+            access247: "وصول 24/7",
+            safeSpace: "مساحة آمنة",
+            masterSkill: "أتقن أي مهارة مع تدريب AI مخصص"
+        },
+        zh: {
+            welcome: "欢迎来到 Infinity Coach！",
+            personalize: "让我们个性化您的体验",
+            whatName: "我该怎么称呼您？",
+            namePlaceholder: "您的名字或昵称",
+            interfaceLang: "界面语言",
+            practiceLang: "您想练习哪种语言？",
+            selectLanguage: "选择语言...",
+            yourLevel: "您的水平",
+            letsStart: "开始吧！",
+            goodMorning: "早上好",
+            goodAfternoon: "下午好",
+            goodEvening: "晚上好",
+            chooseCoach: "选择您的教练并开始进步",
+            language: "语言",
+            level: "水平",
+            speed: "速度",
+            selectCoach: "选择教练",
+            attachFile: "附加文件",
+            addContext: "添加上下文（可选）...",
+            chatMode: "聊天模式",
+            callMode: "通话模式",
+            holdToSpeak: "按住说话",
+            listening: "正在听...",
+            processing: "处理中...",
+            thinking: "思考中...",
+            connected: "已连接",
+            online: "在线",
+            settings: "设置",
+            subscription: "订阅",
+            preferences: "偏好设置",
+            displayName: "显示名称",
+            interface: "界面",
+            practiceLanguage: "练习语言",
+            voiceSpeed: "语音速度",
+            savePreferences: "保存",
+            promoCode: "促销代码",
+            enterCode: "输入代码",
+            apply: "应用",
+            contactSupport: "联系支持",
+            logout: "退出",
+            upgradeToPro: "升级到Pro",
+            monthlyQuestions: "本月剩余问题数",
+            proMember: "Pro会员 - 无限访问",
+            manageSub: "在PayPal管理订阅",
+            popular: "热门",
+            proMonthly: "Pro月付",
+            save40: "节省40%",
+            proYearly: "Pro年付",
+            contact: "联系",
+            name: "姓名",
+            email: "邮箱",
+            message: "消息",
+            send: "发送",
+            messageSent: "消息已发送！",
+            privacy: "隐私",
+            terms: "条款",
+            legal: "法律",
+            privacyPolicy: "隐私政策",
+            termsOfService: "服务条款",
+            beginner: "初学者",
+            intermediate: "中级",
+            advanced: "高级",
+            slow: "慢速",
+            normal: "正常",
+            fast: "快速",
+            active: "活跃",
+            continueGoogle: "使用Google继续",
+            aiCoaching: "AI教练",
+            trackProgress: "跟踪进度",
+            access247: "全天候访问",
+            safeSpace: "安全空间",
+            masterSkill: "通过个性化AI教练掌握任何技能"
+        },
+        ja: {
+            welcome: "Infinity Coachへようこそ！",
+            personalize: "体験をカスタマイズしましょう",
+            whatName: "なんとお呼びしますか？",
+            namePlaceholder: "お名前またはニックネーム",
+            interfaceLang: "インターフェース言語",
+            practiceLang: "どの言語を練習しますか？",
+            selectLanguage: "言語を選択...",
+            yourLevel: "あなたのレベル",
+            letsStart: "始めましょう！",
+            goodMorning: "おはようございます",
+            goodAfternoon: "こんにちは",
+            goodEvening: "こんばんは",
+            chooseCoach: "コーチを選んで上達しましょう",
+            language: "言語",
+            level: "レベル",
+            speed: "速度",
+            selectCoach: "コーチを選択",
+            attachFile: "ファイルを添付",
+            addContext: "コンテキストを追加（任意）...",
+            chatMode: "チャットモード",
+            callMode: "通話モード",
+            holdToSpeak: "押しながら話す",
+            listening: "聞いています...",
+            processing: "処理中...",
+            thinking: "考え中...",
+            connected: "接続済み",
+            online: "オンライン",
+            settings: "設定",
+            subscription: "サブスクリプション",
+            preferences: "環境設定",
+            displayName: "表示名",
+            interface: "インターフェース",
+            practiceLanguage: "練習言語",
+            voiceSpeed: "音声速度",
+            savePreferences: "保存",
+            promoCode: "プロモーションコード",
+            enterCode: "コードを入力",
+            apply: "適用",
+            contactSupport: "サポートに連絡",
+            logout: "ログアウト",
+            upgradeToPro: "Proにアップグレード",
+            monthlyQuestions: "今月の残り質問数",
+            proMember: "Proメンバー - 無制限アクセス",
+            manageSub: "PayPalでサブスク管理",
+            popular: "人気",
+            proMonthly: "Pro月額",
+            save40: "40%お得",
+            proYearly: "Pro年額",
+            contact: "連絡先",
+            name: "名前",
+            email: "メール",
+            message: "メッセージ",
+            send: "送信",
+            messageSent: "メッセージを送信しました！",
+            privacy: "プライバシー",
+            terms: "利用規約",
+            legal: "法的情報",
+            privacyPolicy: "プライバシーポリシー",
+            termsOfService: "利用規約",
+            beginner: "初心者",
+            intermediate: "中級",
+            advanced: "上級",
+            slow: "遅い",
+            normal: "普通",
+            fast: "速い",
+            active: "アクティブ",
+            continueGoogle: "Googleで続行",
+            aiCoaching: "AIコーチング",
+            trackProgress: "進捗を追跡",
+            access247: "24時間アクセス",
+            safeSpace: "安全な空間",
+            masterSkill: "パーソナライズされたAIコーチングでスキルを習得"
+        },
+        ko: {
+            welcome: "Infinity Coach에 오신 것을 환영합니다!",
+            personalize: "경험을 맞춤 설정해 봅시다",
+            whatName: "뭐라고 부를까요?",
+            namePlaceholder: "이름 또는 별명",
+            interfaceLang: "인터페이스 언어",
+            practiceLang: "어떤 언어를 연습하고 싶으세요?",
+            selectLanguage: "언어 선택...",
+            yourLevel: "당신의 레벨",
+            letsStart: "시작합시다!",
+            goodMorning: "좋은 아침이에요",
+            goodAfternoon: "좋은 오후예요",
+            goodEvening: "좋은 저녁이에요",
+            chooseCoach: "코치를 선택하고 실력을 향상하세요",
+            language: "언어",
+            level: "레벨",
+            speed: "속도",
+            selectCoach: "코치 선택",
+            attachFile: "파일 첨부",
+            addContext: "컨텍스트 추가 (선택사항)...",
+            chatMode: "채팅 모드",
+            callMode: "통화 모드",
+            holdToSpeak: "누르고 말하기",
+            listening: "듣는 중...",
+            processing: "처리 중...",
+            thinking: "생각 중...",
+            connected: "연결됨",
+            online: "온라인",
+            settings: "설정",
+            subscription: "구독",
+            preferences: "환경설정",
+            displayName: "표시 이름",
+            interface: "인터페이스",
+            practiceLanguage: "연습 언어",
+            voiceSpeed: "음성 속도",
+            savePreferences: "저장",
+            promoCode: "프로모션 코드",
+            enterCode: "코드 입력",
+            apply: "적용",
+            contactSupport: "지원팀 문의",
+            logout: "로그아웃",
+            upgradeToPro: "Pro로 업그레이드",
+            monthlyQuestions: "이번 달 남은 질문",
+            proMember: "Pro 회원 - 무제한 액세스",
+            manageSub: "PayPal에서 구독 관리",
+            popular: "인기",
+            proMonthly: "Pro 월간",
+            save40: "40% 절약",
+            proYearly: "Pro 연간",
+            contact: "연락처",
+            name: "이름",
+            email: "이메일",
+            message: "메시지",
+            send: "보내기",
+            messageSent: "메시지가 전송되었습니다!",
+            privacy: "개인정보",
+            terms: "약관",
+            legal: "법적",
+            privacyPolicy: "개인정보 처리방침",
+            termsOfService: "서비스 약관",
+            beginner: "초급",
+            intermediate: "중급",
+            advanced: "고급",
+            slow: "느림",
+            normal: "보통",
+            fast: "빠름",
+            active: "활성",
+            continueGoogle: "Google로 계속",
+            aiCoaching: "AI 코칭",
+            trackProgress: "진행 상황 추적",
+            access247: "24시간 액세스",
+            safeSpace: "안전한 공간",
+            masterSkill: "맞춤형 AI 코칭으로 모든 기술을 마스터하세요"
+        },
+        nl: {
+            welcome: "Welkom bij Infinity Coach!",
+            personalize: "Laten we je ervaring personaliseren",
+            whatName: "Hoe mag ik je noemen?",
+            namePlaceholder: "Je naam of bijnaam",
+            interfaceLang: "Interfacetaal",
+            practiceLang: "Welke taal wil je oefenen?",
+            selectLanguage: "Selecteer een taal...",
+            yourLevel: "Je niveau",
+            letsStart: "Laten we beginnen!",
+            goodMorning: "Goedemorgen",
+            goodAfternoon: "Goedemiddag",
+            goodEvening: "Goedenavond",
+            chooseCoach: "Kies je coach en verbeter jezelf",
+            language: "Taal",
+            level: "Niveau",
+            speed: "Snelheid",
+            selectCoach: "Selecteer Coach",
+            attachFile: "Bestand bijvoegen",
+            addContext: "Context toevoegen (optioneel)...",
+            chatMode: "Chat Modus",
+            callMode: "Bel Modus",
+            holdToSpeak: "Ingedrukt houden om te spreken",
+            listening: "Luistert...",
+            processing: "Verwerkt...",
+            thinking: "Denkt na...",
+            connected: "Verbonden",
+            online: "Online",
+            settings: "Instellingen",
+            subscription: "Abonnement",
+            preferences: "Voorkeuren",
+            displayName: "Weergavenaam",
+            interface: "Interface",
+            practiceLanguage: "Oefentaal",
+            voiceSpeed: "Stemsnelheid",
+            savePreferences: "Opslaan",
+            promoCode: "Promotiecode",
+            enterCode: "Code invoeren",
+            apply: "Toepassen",
+            contactSupport: "Contact support",
+            logout: "Uitloggen",
+            upgradeToPro: "Upgraden naar Pro",
+            monthlyQuestions: "Maandelijkse vragen over",
+            proMember: "Pro lid - Onbeperkte toegang",
+            manageSub: "Abonnement beheren in PayPal",
+            popular: "POPULAIR",
+            proMonthly: "Pro Maandelijks",
+            save40: "BESPAAR 40%",
+            proYearly: "Pro Jaarlijks",
+            contact: "Contact",
+            name: "Naam",
+            email: "E-mail",
+            message: "Bericht",
+            send: "Versturen",
+            messageSent: "Bericht verzonden!",
+            privacy: "Privacy",
+            terms: "Voorwaarden",
+            legal: "Juridisch",
+            privacyPolicy: "Privacybeleid",
+            termsOfService: "Servicevoorwaarden",
+            beginner: "Beginner",
+            intermediate: "Gevorderd",
+            advanced: "Expert",
+            slow: "Langzaam",
+            normal: "Normaal",
+            fast: "Snel",
+            active: "ACTIEF",
+            continueGoogle: "Doorgaan met Google",
+            aiCoaching: "AI Coaching",
+            trackProgress: "Voortgang volgen",
+            access247: "24/7 toegang",
+            safeSpace: "Veilige ruimte",
+            masterSkill: "Beheers elke vaardigheid met gepersonaliseerde AI-coaching"
+        },
+        tr: {
+            welcome: "Infinity Coach'a Hoş Geldiniz!",
+            personalize: "Deneyiminizi kişiselleştirelim",
+            whatName: "Size nasıl hitap etmeliyim?",
+            namePlaceholder: "Adınız veya takma adınız",
+            interfaceLang: "Arayüz Dili",
+            practiceLang: "Hangi dili pratik yapmak istiyorsunuz?",
+            selectLanguage: "Bir dil seçin...",
+            yourLevel: "Seviyeniz",
+            letsStart: "Başlayalım!",
+            goodMorning: "Günaydın",
+            goodAfternoon: "İyi günler",
+            goodEvening: "İyi akşamlar",
+            chooseCoach: "Koçunuzu seçin ve gelişin",
+            language: "Dil",
+            level: "Seviye",
+            speed: "Hız",
+            selectCoach: "Koç Seç",
+            attachFile: "Dosya ekle",
+            addContext: "Bağlam ekle (isteğe bağlı)...",
+            chatMode: "Sohbet Modu",
+            callMode: "Arama Modu",
+            holdToSpeak: "Konuşmak için basılı tut",
+            listening: "Dinliyor...",
+            processing: "İşleniyor...",
+            thinking: "Düşünüyor...",
+            connected: "Bağlandı",
+            online: "Çevrimiçi",
+            settings: "Ayarlar",
+            subscription: "Abonelik",
+            preferences: "Tercihler",
+            displayName: "Görünen Ad",
+            interface: "Arayüz",
+            practiceLanguage: "Pratik Dili",
+            voiceSpeed: "Ses Hızı",
+            savePreferences: "Kaydet",
+            promoCode: "Promosyon Kodu",
+            enterCode: "Kodu girin",
+            apply: "Uygula",
+            contactSupport: "Destek ile iletişime geç",
+            logout: "Çıkış",
+            upgradeToPro: "Pro'ya Yükselt",
+            monthlyQuestions: "Kalan aylık sorular",
+            proMember: "Pro üye - Sınırsız erişim",
+            manageSub: "PayPal'da aboneliği yönet",
+            popular: "POPÜLER",
+            proMonthly: "Pro Aylık",
+            save40: "%40 TASARRUF",
+            proYearly: "Pro Yıllık",
+            contact: "İletişim",
+            name: "Ad",
+            email: "E-posta",
+            message: "Mesaj",
+            send: "Gönder",
+            messageSent: "Mesaj gönderildi!",
+            privacy: "Gizlilik",
+            terms: "Şartlar",
+            legal: "Yasal",
+            privacyPolicy: "Gizlilik Politikası",
+            termsOfService: "Hizmet Şartları",
+            beginner: "Başlangıç",
+            intermediate: "Orta",
+            advanced: "İleri",
+            slow: "Yavaş",
+            normal: "Normal",
+            fast: "Hızlı",
+            active: "AKTİF",
+            continueGoogle: "Google ile devam et",
+            aiCoaching: "AI Koçluk",
+            trackProgress: "İlerlemeyi takip et",
+            access247: "7/24 Erişim",
+            safeSpace: "Güvenli alan",
+            masterSkill: "Kişiselleştirilmiş AI koçluğu ile her beceriyi öğrenin"
+        },
+        pl: {
+            welcome: "Witaj w Infinity Coach!",
+            personalize: "Spersonalizujmy Twoje doświadczenie",
+            whatName: "Jak mam się do Ciebie zwracać?",
+            namePlaceholder: "Twoje imię lub pseudonim",
+            interfaceLang: "Język interfejsu",
+            practiceLang: "Jaki język chcesz ćwiczyć?",
+            selectLanguage: "Wybierz język...",
+            yourLevel: "Twój poziom",
+            letsStart: "Zaczynamy!",
+            goodMorning: "Dzień dobry",
+            goodAfternoon: "Dzień dobry",
+            goodEvening: "Dobry wieczór",
+            chooseCoach: "Wybierz swojego coacha i rozwijaj się",
+            language: "Język",
+            level: "Poziom",
+            speed: "Prędkość",
+            selectCoach: "Wybierz Coacha",
+            attachFile: "Załącz plik",
+            addContext: "Dodaj kontekst (opcjonalnie)...",
+            chatMode: "Tryb Czatu",
+            callMode: "Tryb Rozmowy",
+            holdToSpeak: "Przytrzymaj, aby mówić",
+            listening: "Słucham...",
+            processing: "Przetwarzam...",
+            thinking: "Myślę...",
+            connected: "Połączono",
+            online: "Online",
+            settings: "Ustawienia",
+            subscription: "Subskrypcja",
+            preferences: "Preferencje",
+            displayName: "Nazwa wyświetlana",
+            interface: "Interfejs",
+            practiceLanguage: "Język ćwiczeń",
+            voiceSpeed: "Prędkość głosu",
+            savePreferences: "Zapisz",
+            promoCode: "Kod promocyjny",
+            enterCode: "Wprowadź kod",
+            apply: "Zastosuj",
+            contactSupport: "Skontaktuj się z pomocą",
+            logout: "Wyloguj",
+            upgradeToPro: "Ulepsz do Pro",
+            monthlyQuestions: "Pozostałe pytania w miesiącu",
+            proMember: "Członek Pro - Nielimitowany dostęp",
+            manageSub: "Zarządzaj subskrypcją w PayPal",
+            popular: "POPULARNY",
+            proMonthly: "Pro Miesięcznie",
+            save40: "OSZCZĘDŹ 40%",
+            proYearly: "Pro Rocznie",
+            contact: "Kontakt",
+            name: "Imię",
+            email: "Email",
+            message: "Wiadomość",
+            send: "Wyślij",
+            messageSent: "Wiadomość wysłana!",
+            privacy: "Prywatność",
+            terms: "Warunki",
+            legal: "Prawne",
+            privacyPolicy: "Polityka prywatności",
+            termsOfService: "Warunki usługi",
+            beginner: "Początkujący",
+            intermediate: "Średniozaawansowany",
+            advanced: "Zaawansowany",
+            slow: "Wolno",
+            normal: "Normalnie",
+            fast: "Szybko",
+            active: "AKTYWNY",
+            continueGoogle: "Kontynuuj przez Google",
+            aiCoaching: "Coaching AI",
+            trackProgress: "Śledź postępy",
+            access247: "Dostęp 24/7",
+            safeSpace: "Bezpieczna przestrzeń",
+            masterSkill: "Opanuj każdą umiejętność dzięki spersonalizowanemu coachingowi AI"
         }
+    };
 
-        async function stopRec() {
-            if(!mediaRecorder || mediaRecorder.state === 'inactive') return;
-            mediaRecorder.stop();
-            micBtn.classList.remove('bg-red-500', 'scale-110');
-            statusTxt.innerText = "Processing...";
-            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    const INTERFACE_LANGUAGES = {
+        en: { flag: "🇬🇧", name: "English" },
+        fr: { flag: "🇫🇷", name: "Français" },
+        es: { flag: "🇪🇸", name: "Español" },
+        de: { flag: "🇩🇪", name: "Deutsch" },
+        it: { flag: "🇮🇹", name: "Italiano" },
+        pt: { flag: "🇵🇹", name: "Português" },
+        nl: { flag: "🇳🇱", name: "Nederlands" },
+        pl: { flag: "🇵🇱", name: "Polski" },
+        ru: { flag: "🇷🇺", name: "Русский" },
+        tr: { flag: "🇹🇷", name: "Türkçe" },
+        ar: { flag: "🇸🇦", name: "العربية" },
+        he: { flag: "🇮🇱", name: "עברית" },
+        zh: { flag: "🇨🇳", name: "中文" },
+        ja: { flag: "🇯🇵", name: "日本語" },
+        ko: { flag: "🇰🇷", name: "한국어" },
+        hi: { flag: "🇮🇳", name: "हिन्दी" },
+        sv: { flag: "🇸🇪", name: "Svenska" },
+        el: { flag: "🇬🇷", name: "Ελληνικά" },
+        cs: { flag: "🇨🇿", name: "Čeština" },
+        ro: { flag: "🇷🇴", name: "Română" },
+        hu: { flag: "🇭🇺", name: "Magyar" },
+        th: { flag: "🇹🇭", name: "ไทย" },
+        vi: { flag: "🇻🇳", name: "Tiếng Việt" },
+        id: { flag: "🇮🇩", name: "Bahasa Indonesia" },
+        uk: { flag: "🇺🇦", name: "Українська" },
+        no: { flag: "🇳🇴", name: "Norsk" },
+        da: { flag: "🇩🇰", name: "Dansk" },
+        fi: { flag: "🇫🇮", name: "Suomi" }
+    };
 
-            mediaRecorder.onstop = async () => {
-                const mimeType = mediaRecorder.mimeType;
-                const blob = new Blob(audioChunks, { type: mimeType });
-                if (blob.size < 500) { statusTxt.innerText = "Too short"; return; }
-                
-                const fd = new FormData(); 
-                fd.append('audio', blob); 
-                fd.append('session_id', sessionId);
-                fd.append('mime_type', mimeType); 
-                
-                try {
-                    addMessage('user', '...'); 
-                    const res = await fetch('/analyze', {method: 'POST', body: fd});
-                    const d = await res.json();
-                    if (d.error) throw new Error(d.error);
+    const state = {
+        user: null,
+        coaches: {},
+        languages: {},
+        sessions: {},
+        selectedCoach: 'job_interview',
+        speed: 1.0,
+        sessionId: '',
+        mode: 'text',
+        lastAudio: null,
+        mediaRecorder: null,
+        audioChunks: [],
+        fileContext: '',
+        currentLang: localStorage.getItem('interfaceLang') || 'en',
+        currentModal: null
+    };
 
-                    document.querySelector('.bubble-user:last-child').innerText = d.transcription_user;
-                    setTimeout(() => {
-                        addMessage('coach', d.coach_response_text, { score: d.score_pronunciation, tip: d.next_step_advice, better: d.better_response_example });
-                        if(d.audio_base64) playAudio(d.audio_base64);
-                    }, 500);
-                } catch(e) { 
-                    document.querySelector('.bubble-user:last-child').innerText = "⚠️ Error. Speak louder."; 
+    function t(key) {
+        return TRANSLATIONS[state.currentLang]?.[key] || TRANSLATIONS.en[key] || key;
+    }
+
+    function isRTL() {
+        return ['ar', 'he'].includes(state.currentLang);
+    }
+
+    function applyTranslations() {
+        document.documentElement.dir = isRTL() ? 'rtl' : 'ltr';
+        
+        // Update all data-i18n elements
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            el.textContent = t(el.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            el.placeholder = t(el.dataset.i18nPlaceholder);
+        });
+    }
+
+    function setLanguage(lang) {
+        state.currentLang = lang;
+        localStorage.setItem('interfaceLang', lang);
+        applyTranslations();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════════
+    window.onload = async () => {
+        applyTranslations();
+        checkCookies();
+        
+        try {
+            // SSR: Use pre-loaded data if available (instant), otherwise fetch (fallback)
+            let me, coaches, langs, sessions;
+            
+            if (typeof SSR_USER !== 'undefined' && SSR_USER) {
+                // FAST PATH: Data already loaded by server
+                me = SSR_USER;
+                coaches = SSR_COACHES;
+                langs = SSR_LANGUAGES;
+                sessions = SSR_SESSIONS || [];
+            } else {
+                // FALLBACK: Fetch from API (slower)
+                me = await fetch('/api/me').then(r => r.json());
+                if (me.logged_in) {
+                    [coaches, langs, sessions] = await Promise.all([
+                        fetch('/api/coaches').then(r => r.json()),
+                        fetch('/api/languages').then(r => r.json()),
+                        fetch('/api/my_sessions').then(r => r.json())
+                    ]);
                 }
-                finally { statusTxt.innerText = "Hold to Speak"; }
-            };
+            }
+            
+            state.user = me;
+            
+            if (me.interface_lang) {
+                state.currentLang = me.interface_lang;
+                localStorage.setItem('interfaceLang', me.interface_lang);
+                applyTranslations();
+            }
+            
+            if (!me.logged_in) {
+                document.getElementById('login-screen').classList.remove('hidden');
+                return;
+            }
+            
+            state.coaches = coaches;
+            state.languages = langs.target;
+            if (sessions) sessions.forEach(s => state.sessions[s.category] = s.session_id);
+            
+            setupDashboard();
+            document.getElementById('dashboard').classList.remove('hidden');
+            checkOnboarding();
+            
+        } catch (err) {
+            console.error(err);
+            document.getElementById('login-screen').classList.remove('hidden');
         }
+    };
+
+    function setupDashboard() {
+        // Apply translations to dashboard
+        applyDashboardTranslations();
+        
+        // Greeting
+        const hour = new Date().getHours();
+        const greetingKey = hour < 12 ? 'goodMorning' : hour < 18 ? 'goodAfternoon' : 'goodEvening';
+        document.getElementById('greeting').textContent = t(greetingKey);
+        document.getElementById('user-name').textContent = state.user.display_name || state.user.name?.split(' ')[0] || 'there';
+        
+        // Quota
+        if (!state.user.is_paid) {
+            const rem = state.user.remaining_questions;
+            document.getElementById('quota-text').textContent = `${rem}/10`;
+            document.getElementById('quota-fill').style.width = `${rem * 10}%`;
+            document.getElementById('quota-display').classList.remove('hidden');
+        }
+        
+        // Languages
+        const langSel = document.getElementById('inp-lang');
+        langSel.innerHTML = Object.entries(state.languages)
+            .map(([k, v]) => `<option value="${k}">${v.flag} ${k}</option>`).join('');
+        if (state.user.target_lang) langSel.value = state.user.target_lang;
+        
+        // Level options translated
+        const levelSel = document.getElementById('inp-level');
+        levelSel.innerHTML = `
+            <option value="Beginner">${t('beginner')}</option>
+            <option value="Intermediate">${t('intermediate')}</option>
+            <option value="Advanced">${t('advanced')}</option>
+        `;
+        if (state.user.level) levelSel.value = state.user.level;
+        
+        // Coaches
+        renderCoaches();
+    }
+    
+    function applyDashboardTranslations() {
+        // Labels
+        const el = (id) => document.getElementById(id);
+        if (el('dashboard-subtitle')) el('dashboard-subtitle').textContent = t('chooseCoach');
+        if (el('label-language')) el('label-language').textContent = t('language');
+        if (el('label-level')) el('label-level').textContent = t('level');
+        if (el('label-speed')) el('label-speed').textContent = t('speed');
+        if (el('label-select-coach')) el('label-select-coach').textContent = t('selectCoach');
+        if (el('file-label') && el('file-label').textContent === 'Attach file') el('file-label').textContent = t('attachFile');
+        if (el('inp-context')) el('inp-context').placeholder = t('addContext');
+        if (el('btn-chat')) el('btn-chat').querySelector('span').textContent = t('chatMode');
+        if (el('btn-call')) el('btn-call').querySelector('span').textContent = t('callMode');
+    }
+
+    function renderCoaches() {
+        const grid = document.getElementById('coaches-grid');
+        grid.innerHTML = '';
+        
+        Object.entries(state.coaches).forEach(([key, coach]) => {
+            const hasSession = state.sessions[key];
+            const div = document.createElement('div');
+            div.className = `card cursor-pointer overflow-hidden ${key === state.selectedCoach ? 'selected' : ''}`;
+            div.onclick = () => selectCoach(key, div);
+            
+            div.innerHTML = `
+                <div class="relative h-28 sm:h-32 overflow-hidden">
+                    <img src="/static/${coach.cover_image || 'cover_default.jpg'}" class="w-full h-full object-cover" 
+                         onerror="this.style.background='linear-gradient(135deg,#3b82f6,#1d4ed8)'">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                    <div class="absolute bottom-2 left-3 right-3">
+                        <h4 class="font-bold text-sm text-white">${coach.name}</h4>
+                        <p class="text-[10px] text-white/70">${coach.role}</p>
+                    </div>
+                    ${hasSession ? '<div class="absolute top-2 right-2 bg-green-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full">ACTIVE</div>' : ''}
+                </div>
+            `;
+            grid.appendChild(div);
+        });
+    }
+
+    function selectCoach(key, el) {
+        state.selectedCoach = key;
+        document.querySelectorAll('#coaches-grid .card').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+    }
+
+    function setSpeed(s) {
+        state.speed = s;
+        document.querySelectorAll('.speed-btn').forEach(b => 
+            b.classList.toggle('active', parseFloat(b.textContent) === s || (b.textContent === '1x' && s === 1.0)));
+    }
+
+    async function handleFile() {
+        const file = document.getElementById('inp-file').files[0];
+        if (!file) return;
+        
+        document.getElementById('file-label').textContent = file.name.length > 15 ? file.name.slice(0, 15) + '...' : file.name;
+        
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            
+            const res = await fetch('/upload_file', { method: 'POST', body: fd });
+            const data = await res.json();
+            
+            if (data.extracted_text) {
+                state.fileContext = data.extracted_text;
+                document.getElementById('file-status').classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error(err);
+            document.getElementById('file-label').textContent = 'Error - retry';
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SESSION
+    // ═══════════════════════════════════════════════════════════════
+    async function startSession(mode) {
+        if (!state.user.is_paid && !state.user.can_ask) {
+            showUpgradeModal();
+            return;
+        }
+        
+        state.mode = mode;
+        state.sessionId = state.sessions[state.selectedCoach] || 'sess_' + Date.now();
+        
+        const coach = state.coaches[state.selectedCoach];
+        
+        try {
+            const res = await fetch('/start_chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: state.sessionId,
+                    category: state.selectedCoach,
+                    language: document.getElementById('inp-lang').value,
+                    level: document.getElementById('inp-level').value,
+                    context_data: document.getElementById('inp-context').value,
+                    file_context: state.fileContext,
+                    speed: state.speed,
+                    resume: !!state.sessions[state.selectedCoach]
+                })
+            });
+            
+            if (!res.ok) {
+                const err = await res.json();
+                if (err.error === 'limit_reached') { showUpgradeModal(); return; }
+                throw new Error(err.error);
+            }
+            
+            const data = await res.json();
+            
+            document.getElementById('dashboard').classList.add('hidden');
+            
+            if (mode === 'call') {
+                openCallMode(coach, data);
+            } else {
+                openChatMode(coach, data);
+            }
+            
+        } catch (err) {
+            console.error(err);
+            alert('Failed to start session');
+        }
+    }
+
+    function openChatMode(coach, data) {
+        document.getElementById('chat-screen').classList.remove('hidden');
+        document.getElementById('chat-coach-name').textContent = coach.name;
+        document.getElementById('chat-messages').innerHTML = '';
+        
+        if (data.history?.length) {
+            data.history.forEach(h => addMessage(h.role === 'assistant' ? 'coach' : 'user', h.content));
+        } else if (data.coach_response_text) {
+            addMessage('coach', data.coach_response_text);
+        }
+        
+        if (data.audio_base64) playAudio(data.audio_base64);
+        setupMic(document.getElementById('mic-btn'));
+    }
+
+    function openCallMode(coach, data) {
+        document.getElementById('call-screen').classList.remove('hidden');
+        document.getElementById('call-coach-name').textContent = coach.name;
+        document.getElementById('call-avatar').src = `/static/${coach.video_base || 'default'}_idle.mp4`;
+        document.getElementById('call-avatar').play().catch(() => {});
+        
+        if (data.audio_base64) playAudio(data.audio_base64);
+        setupMic(document.getElementById('call-mic-btn'));
+    }
+
+    function toggleCallMode() {
+        const coach = state.coaches[state.selectedCoach];
+        
+        if (state.mode === 'text') {
+            document.getElementById('chat-screen').classList.add('hidden');
+            document.getElementById('call-screen').classList.remove('hidden');
+            document.getElementById('call-coach-name').textContent = coach.name;
+            document.getElementById('call-avatar').src = `/static/${coach.video_base || 'default'}_idle.mp4`;
+            document.getElementById('call-avatar').play().catch(() => {});
+            setupMic(document.getElementById('call-mic-btn'));
+            state.mode = 'call';
+        } else {
+            document.getElementById('call-screen').classList.add('hidden');
+            document.getElementById('chat-screen').classList.remove('hidden');
+            setupMic(document.getElementById('mic-btn'));
+            state.mode = 'text';
+        }
+    }
+
+    function exitChat() {
+        document.getElementById('chat-screen').classList.add('hidden');
+        document.getElementById('call-screen').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        location.reload();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MESSAGING
+    // ═══════════════════════════════════════════════════════════════
+    function addMessage(role, text) {
+        const box = document.getElementById('chat-messages');
+        const isRTL = /[\u0590-\u05FF\u0600-\u06FF]/.test(text);
+        
+        const div = document.createElement('div');
+        div.className = `flex ${role === 'coach' ? 'justify-start' : 'justify-end'}`;
+        div.innerHTML = `<div class="bubble ${role === 'coach' ? 'bubble-coach' : 'bubble-user'}" ${isRTL ? 'dir="rtl"' : ''}>${text}</div>`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    async function sendMessage(text) {
+        if (!text.trim()) return;
+        
+        if (state.mode === 'text') addMessage('user', text);
+        updateStatus('Thinking...');
+        
+        const fd = new FormData();
+        fd.append('text_input', text);
+        fd.append('session_id', state.sessionId);
+        fd.append('speed', state.speed);
+        
+        try {
+            const res = await fetch('/analyze', { method: 'POST', body: fd });
+            if (!res.ok) throw new Error('Failed');
+            
+            const data = await res.json();
+            
+            if (state.mode === 'text') {
+                addMessage('coach', data.coach_response_text);
+            }
+            
+            if (data.audio_base64) playAudio(data.audio_base64);
+            
+            if (!state.user.is_paid) {
+                state.user.remaining_questions = Math.max(0, state.user.remaining_questions - 1);
+            }
+            
+        } catch (err) {
+            console.error(err);
+            if (state.mode === 'text') addMessage('coach', 'Sorry, please try again.');
+        }
+        
+        updateStatus('Hold to speak');
+    }
+
+    async function sendTextMessage() {
+        const inp = document.getElementById('text-input');
+        await sendMessage(inp.value);
+        inp.value = '';
+    }
+
+    function toggleTextInput() {
+        document.getElementById('voice-controls').classList.toggle('hidden');
+        document.getElementById('text-controls').classList.toggle('hidden');
+    }
+
+    function updateStatus(text) {
+        const el = document.getElementById('mic-status');
+        if (el) el.textContent = text;
+        
+        const callStatus = document.getElementById('call-status-text');
+        if (callStatus) callStatus.textContent = text;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // AUDIO
+    // ═══════════════════════════════════════════════════════════════
+    function playAudio(b64) {
+        const audio = new Audio('data:audio/mp3;base64,' + b64);
+        state.lastAudio = audio;
+        
+        const vid = document.getElementById('call-avatar');
+        if (vid && state.mode === 'call') {
+            const coach = state.coaches[state.selectedCoach];
+            vid.src = `/static/${coach.video_base || 'default'}_talk.mp4`;
+            vid.play().catch(() => {});
+        }
+        
+        audio.play();
+        audio.onended = () => {
+            if (vid && state.mode === 'call') {
+                const coach = state.coaches[state.selectedCoach];
+                vid.src = `/static/${coach.video_base || 'default'}_idle.mp4`;
+                vid.play().catch(() => {});
+            }
+        };
+    }
+
+    function replayAudio() {
+        if (state.lastAudio) {
+            state.lastAudio.currentTime = 0;
+            state.lastAudio.play();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICROPHONE
+    // ═══════════════════════════════════════════════════════════════
+    function setupMic(btn) {
+        if (!btn) return;
+        btn.onmousedown = btn.ontouchstart = (e) => { e.preventDefault(); startRecording(btn); };
+        btn.onmouseup = btn.ontouchend = (e) => { e.preventDefault(); stopRecording(btn); };
+    }
+
+    async function startRecording(btn) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            state.mediaRecorder = new MediaRecorder(stream);
+            state.audioChunks = [];
+            
+            state.mediaRecorder.ondataavailable = e => state.audioChunks.push(e.data);
+            state.mediaRecorder.start();
+            
+            btn.classList.add('active');
+            updateStatus('Listening...');
+        } catch (err) {
+            console.error(err);
+            alert('Microphone access required');
+        }
+    }
+
+    async function stopRecording(btn) {
+        if (!state.mediaRecorder || state.mediaRecorder.state !== 'recording') return;
+        
+        state.mediaRecorder.stop();
+        btn.classList.remove('active');
+        updateStatus('Processing...');
+        
+        state.mediaRecorder.onstop = async () => {
+            const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
+            const fd = new FormData();
+            fd.append('audio', blob, 'audio.webm');
+            fd.append('session_id', state.sessionId);
+            fd.append('speed', state.speed);
+            
+            try {
+                const res = await fetch('/analyze', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error('Failed');
+                
+                const data = await res.json();
+                
+                if (data.transcription_user && state.mode === 'text') {
+                    addMessage('user', data.transcription_user);
+                }
+                
+                if (state.mode === 'text') {
+                    addMessage('coach', data.coach_response_text);
+                }
+                
+                if (data.audio_base64) playAudio(data.audio_base64);
+                
+            } catch (err) {
+                console.error(err);
+            }
+            
+            updateStatus('Hold to speak');
+            state.mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MODALS
+    // ═══════════════════════════════════════════════════════════════
+    function showModal(type) {
+        state.currentModal = type;
+        const body = document.getElementById('modal-body');
+        
+        // Generate interface language options dynamically
+        const interfaceLangOptions = Object.entries(INTERFACE_LANGUAGES)
+            .map(([code, data]) => `<option value="${code}" ${state.user?.interface_lang === code || (!state.user?.interface_lang && code === state.currentLang) ? 'selected' : ''}>${data.flag} ${data.name}</option>`)
+            .join('');
+        
+        const modals = {
+            settings: `
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold">${t('settings')}</h2>
+                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+                </div>
+                
+                <!-- Profile -->
+                <div class="flex items-center gap-4 p-4 glass rounded-xl mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center overflow-hidden">
+                        ${state.user?.avatar_url ? `<img src="${state.user.avatar_url}" class="w-full h-full object-cover">` : '<i class="fas fa-user text-white"></i>'}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold truncate">${state.user?.name || 'User'}</p>
+                        <p class="text-sm text-slate-400 truncate">${state.user?.email || ''}</p>
+                    </div>
+                    <span class="badge ${state.user?.is_paid ? 'badge-pro' : 'badge-free'}">${state.user?.is_paid ? 'PRO' : 'FREE'}</span>
+                </div>
+                
+                <!-- Subscription -->
+                <div class="p-4 glass rounded-xl mb-4">
+                    <h3 class="font-semibold text-sm mb-3 flex items-center gap-2"><i class="fas fa-crown text-yellow-500"></i>Subscription</h3>
+                    ${!state.user?.is_paid ? `
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="quota-bar flex-1"><div class="quota-fill" style="width:${(state.user?.remaining_questions || 0) * 10}%"></div></div>
+                            <span class="text-sm">${state.user?.remaining_questions || 0}/10</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-3">Monthly questions remaining</p>
+                        <button onclick="showModal('pricing')" class="w-full btn-primary text-sm py-2"><i class="fas fa-rocket mr-2"></i>Upgrade to Pro</button>
+                    ` : `
+                        <p class="text-sm text-green-400 flex items-center gap-2 mb-2"><i class="fas fa-check-circle"></i>Pro member - Unlimited access</p>
+                        <p class="text-xs text-slate-400">Manage subscription in PayPal</p>
+                    `}
+                </div>
+                
+                <!-- Preferences -->
+                <div class="p-4 glass rounded-xl mb-4">
+                    <h3 class="font-semibold text-sm mb-3 flex items-center gap-2"><i class="fas fa-sliders-h text-blue-400"></i>Preferences</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">Display Name</label>
+                            <input type="text" id="set-name" value="${state.user?.display_name || state.user?.name?.split(' ')[0] || ''}" class="w-full text-sm" placeholder="How should I call you?">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1">${t('interface')}</label>
+                                <select id="set-interface" class="w-full text-sm">
+                                    ${interfaceLangOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1">${t('practiceLanguage')}</label>
+                                <select id="set-target" class="w-full text-sm">
+                                    ${Object.entries(state.languages).map(([k,v]) => `<option value="${k}" ${state.user?.target_lang === k ? 'selected' : ''}>${v.flag} ${k}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1">Level</label>
+                                <select id="set-level" class="w-full text-sm">
+                                    <option value="Beginner" ${state.user?.level === 'Beginner' ? 'selected' : ''}>Beginner</option>
+                                    <option value="Intermediate" ${state.user?.level === 'Intermediate' ? 'selected' : ''}>Intermediate</option>
+                                    <option value="Advanced" ${state.user?.level === 'Advanced' ? 'selected' : ''}>Advanced</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1">Voice Speed</label>
+                                <select id="set-speed" class="w-full text-sm">
+                                    <option value="0.8" ${state.user?.voice_speed == 0.8 ? 'selected' : ''}>0.8x Slow</option>
+                                    <option value="1.0" ${state.user?.voice_speed == 1.0 || !state.user?.voice_speed ? 'selected' : ''}>1.0x Normal</option>
+                                    <option value="1.2" ${state.user?.voice_speed == 1.2 ? 'selected' : ''}>1.2x Fast</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button onclick="saveSettings()" class="w-full btn-primary text-sm py-2"><i class="fas fa-save mr-2"></i>Save Preferences</button>
+                    </div>
+                </div>
+                
+                <!-- Promo Code -->
+                <div class="p-4 glass rounded-xl mb-4">
+                    <h3 class="font-semibold text-sm mb-3 flex items-center gap-2"><i class="fas fa-gift text-pink-400"></i>Promo Code</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="promo-input" class="flex-1 text-sm uppercase" placeholder="Enter code">
+                        <button onclick="applyPromo()" class="btn-secondary text-sm px-4">Apply</button>
+                    </div>
+                    <p id="promo-msg" class="text-xs mt-2 hidden"></p>
+                </div>
+                
+                <!-- Support -->
+                <div class="space-y-2 mb-4">
+                    <button onclick="showModal('contact')" class="w-full btn-secondary text-sm py-3"><i class="fas fa-envelope mr-2"></i>Contact Support</button>
+                    <div class="flex gap-2">
+                        <button onclick="showModal('privacy')" class="flex-1 glass text-xs py-2 rounded-lg text-slate-400 hover:text-white">Privacy</button>
+                        <button onclick="showModal('terms')" class="flex-1 glass text-xs py-2 rounded-lg text-slate-400 hover:text-white">Terms</button>
+                        <button onclick="showModal('legal')" class="flex-1 glass text-xs py-2 rounded-lg text-slate-400 hover:text-white">Legal</button>
+                    </div>
+                </div>
+                
+                <button onclick="location.href='/logout'" class="w-full py-3 rounded-xl bg-red-500/10 text-red-400 font-semibold text-sm"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
+            `,
+            onboarding: `
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                        <i class="fas fa-infinity text-white text-2xl"></i>
+                    </div>
+                    <h2 class="text-lg font-bold mb-1">${t('welcome')}</h2>
+                    <p class="text-sm text-slate-400">${t('personalize')}</p>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">${t('whatName')}</label>
+                        <input type="text" id="onboard-name" class="w-full" placeholder="${t('namePlaceholder')}">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">${t('interfaceLang')}</label>
+                        <select id="onboard-interface" class="w-full">
+                            ${interfaceLangOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">${t('practiceLang')}</label>
+                        <select id="onboard-target" class="w-full" required>
+                            <option value="" disabled selected>${t('selectLanguage')}</option>
+                            ${Object.entries(state.languages).map(([k,v]) => `<option value="${k}">${v.flag} ${k}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">${t('yourLevel')}</label>
+                        <select id="onboard-level" class="w-full">
+                            <option value="Beginner">🌱 ${t('beginner')}</option>
+                            <option value="Intermediate" selected>📚 ${t('intermediate')}</option>
+                            <option value="Advanced">🎯 ${t('advanced')}</option>
+                        </select>
+                    </div>
+                    <button onclick="saveOnboarding()" class="w-full btn-primary py-3"><i class="fas fa-check mr-2"></i>${t('letsStart')}</button>
+                </div>
+            `,
+            pricing: `
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold">Upgrade to Pro</h2>
+                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+                </div>
+                <div class="grid gap-4">
+                    <div class="card p-4 border-2 border-blue-500">
+                        <div class="text-blue-400 text-xs font-bold mb-1">POPULAR</div>
+                        <h3 class="font-bold">Pro Monthly</h3>
+                        <p class="text-2xl font-black mb-3">€7<span class="text-sm font-normal text-slate-400">/mo</span></p>
+                        <div id="paypal-monthly"></div>
+                    </div>
+                    <div class="card p-4">
+                        <div class="text-green-400 text-xs font-bold mb-1">SAVE 40%</div>
+                        <h3 class="font-bold">Pro Yearly</h3>
+                        <p class="text-2xl font-black mb-3">€49<span class="text-sm font-normal text-slate-400">/yr</span></p>
+                        <div id="paypal-yearly"></div>
+                    </div>
+                </div>
+            `,
+            contact: `
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold">Contact</h2>
+                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+                </div>
+                <form onsubmit="submitContact(event)" class="space-y-4">
+                    <input type="text" name="name" placeholder="Name" required class="w-full">
+                    <input type="email" name="email" placeholder="Email" required class="w-full">
+                    <textarea name="message" rows="4" placeholder="Message" required class="w-full"></textarea>
+                    <button type="submit" class="w-full btn-primary">Send</button>
+                </form>
+            `,
+            privacy: `
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold">Privacy Policy</h2>
+                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+                </div>
+                <div class="text-sm text-slate-300 space-y-4">
+                    <p><strong>Last updated:</strong> December 2024</p>
+                    <p>Emmanuel Smadja Ltd (Company No. 336519525) operates Infinity Coach. We collect account info via Google OAuth, usage data, and voice recordings (processed and deleted immediately).</p>
+                    <p>We use OpenAI for AI processing, PayPal for payments, and Neon for database hosting. Under GDPR, you can access, correct, or delete your data by contacting privacy@infinitycoach.ai</p>
+                </div>
+            `,
+            terms: `
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold">Terms of Service</h2>
+                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+                </div>
+                <div class="text-sm text-slate-300 space-y-4">
+                    <p><strong>Last updated:</strong> December 2024</p>
+                    <p>By using Infinity Coach, you agree to these terms. The service provides AI coaching for practice purposes. Pro Monthly: €7/month, Pro Yearly: €49/year. Payments via PayPal, cancel anytime.</p>
+                    <p>We don't guarantee specific outcomes. Service provided "AS IS". Governed by Israeli law, disputes in Tel Aviv courts.</p>
+                </div>
+            `,
+            legal: `
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold">Legal</h2>
+                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+                </div>
+                <div class="text-sm text-slate-300 space-y-2">
+                    <p><strong>Company:</strong> Emmanuel Smadja Ltd</p>
+                    <p><strong>Company No:</strong> 336519525</p>
+                    <p><strong>Country:</strong> Israel</p>
+                    <p><strong>Contact:</strong> contact@infinitycoach.ai</p>
+                </div>
+            `
+        };
+        
+        body.innerHTML = modals[type] || '';
+        document.getElementById('modal-container').classList.remove('hidden');
+        
+        if (type === 'pricing') setTimeout(initPayPal, 100);
+    }
+
+    function handleOverlayClick() {
+        // Ne pas fermer si c'est l'onboarding
+        if (state.currentModal === 'onboarding') return;
+        closeModal();
+    }
+
+    function closeModal() {
+        document.getElementById('modal-container').classList.add('hidden');
+        state.currentModal = null;
+    }
+
+    async function saveSettings() {
+        try {
+            await fetch('/api/update_profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    display_name: document.getElementById('set-name').value,
+                    interface_lang: document.getElementById('set-interface').value,
+                    target_lang: document.getElementById('set-target').value,
+                    level: document.getElementById('set-level').value,
+                    voice_speed: parseFloat(document.getElementById('set-speed').value)
+                })
+            });
+            closeModal();
+            location.reload();
+        } catch (err) { console.error(err); }
+    }
+
+    async function applyPromo() {
+        const code = document.getElementById('promo-input').value.trim();
+        if (!code) return;
+        
+        try {
+            const res = await fetch('/api/promo_code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            const data = await res.json();
+            const msg = document.getElementById('promo-msg');
+            msg.classList.remove('hidden');
+            msg.className = 'text-xs mt-2 ' + (data.status === 'success' ? 'text-green-400' : 'text-red-400');
+            msg.textContent = data.message;
+            if (data.status === 'success') setTimeout(() => location.reload(), 1500);
+        } catch (err) { console.error(err); }
+    }
+
+    function previewLanguage(lang) {
+        // Sauvegarder les valeurs actuelles du formulaire
+        const savedName = document.getElementById('onboard-name')?.value || '';
+        const savedTarget = document.getElementById('onboard-target')?.value || '';
+        const savedLevel = document.getElementById('onboard-level')?.value || 'Intermediate';
+        
+        // Changer la langue
+        setLanguage(lang);
+        
+        // Re-render le modal avec la nouvelle langue
+        showModal('onboarding');
+        
+        // Restaurer les valeurs après un court délai
+        setTimeout(() => {
+            if (document.getElementById('onboard-name')) document.getElementById('onboard-name').value = savedName;
+            if (document.getElementById('onboard-target')) document.getElementById('onboard-target').value = savedTarget;
+            if (document.getElementById('onboard-level')) document.getElementById('onboard-level').value = savedLevel;
+            if (document.getElementById('onboard-interface')) document.getElementById('onboard-interface').value = lang;
+        }, 50);
+    }
+
+    async function saveOnboarding() {
+        const selectedLang = document.getElementById('onboard-interface').value;
+        const targetLang = document.getElementById('onboard-target').value;
+        const level = document.getElementById('onboard-level').value;
+        const displayName = document.getElementById('onboard-name').value;
+        
+        // Validation
+        if (!targetLang) {
+            alert(t('selectLanguage').replace('...', ''));
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/update_profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    display_name: displayName,
+                    interface_lang: selectedLang,
+                    target_lang: targetLang,
+                    level: level,
+                    onboarding_done: true
+                })
+            });
+            
+            if (!response.ok) {
+                console.error('Failed to save profile:', await response.text());
+            }
+            
+            // Apply language immediately
+            setLanguage(selectedLang);
+            
+            closeModal();
+            location.reload();
+        } catch (err) { 
+            console.error('Error saving onboarding:', err);
+            alert('Error saving settings. Please try again.');
+        }
+    }
+
+    function checkOnboarding() {
+        if (state.user && !state.user.onboarding_done) {
+            setTimeout(() => showModal('onboarding'), 500);
+        }
+    }
+
+    function showUpgradeModal() {
+        showModal('pricing');
+    }
+
+    async function submitContact(e) {
+        e.preventDefault();
+        const form = e.target;
+        await fetch('/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: form.name.value,
+                email: form.email.value,
+                message: form.message.value
+            })
+        });
+        form.innerHTML = '<p class="text-green-400 text-center py-8"><i class="fas fa-check-circle text-2xl mb-2"></i><br>Message sent!</p>';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // COOKIES & PAYPAL
+    // ═══════════════════════════════════════════════════════════════
+    function checkCookies() {
+        if (!localStorage.getItem('cookies')) {
+            setTimeout(() => document.getElementById('cookie-banner').classList.add('show'), 1500);
+        }
+    }
+
+    function acceptCookies() {
+        localStorage.setItem('cookies', '1');
+        document.getElementById('cookie-banner').classList.remove('show');
+    }
+
+    function initPayPal() {
+        if (typeof paypal === 'undefined') return;
+        
+        const monthly = document.getElementById('paypal-monthly');
+        const yearly = document.getElementById('paypal-yearly');
+        
+        if (monthly) {
+            paypal.Buttons({
+                style: { layout: 'horizontal', color: 'blue', shape: 'pill', height: 35 },
+                createOrder: (d, a) => a.order.create({ purchase_units: [{ amount: { value: '7.00', currency_code: 'EUR' } }] }),
+                onApprove: async () => {
+                    await fetch('/api/payment_success', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: 'month' }) });
+                    location.reload();
+                }
+            }).render('#paypal-monthly');
+        }
+        
+        if (yearly) {
+            paypal.Buttons({
+                style: { layout: 'horizontal', color: 'gold', shape: 'pill', height: 35 },
+                createOrder: (d, a) => a.order.create({ purchase_units: [{ amount: { value: '49.00', currency_code: 'EUR' } }] }),
+                onApprove: async () => {
+                    await fetch('/api/payment_success', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: 'year' }) });
+                    location.reload();
+                }
+            }).render('#paypal-yearly');
+        }
+    }
     </script>
 </body>
 </html>
